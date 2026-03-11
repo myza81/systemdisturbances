@@ -62,10 +62,10 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
               className={styles.logo}
             >
               <div className={styles.logoIcon}>
-                P
+                G
               </div>
               <span className={styles.logoText}>
-                POWER<span className={styles.logoTextCore}>CORE</span>
+                GRID<span className={styles.logoTextCore}> ANALYZER</span>
               </span>
             </motion.div>
           )}

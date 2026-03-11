@@ -9,20 +9,20 @@ const API_BASE = 'http://localhost:8000/api/v1';
 
 export const DEFAULT_SETTINGS = {
   phaseColors: {
-    R: '#ff4444',
-    Y: '#ffcc00',
-    B: '#4488ff',
-    N: '#44ff88',
-    default: '#aaaaaa',
+    R: '#ef4444',
+    Y: '#f59e0b',
+    B: '#3b82f6',
+    N: '#10b981',
+    default: '#64748b',
   },
   theme: {
-    background: '#0d1117',
-    gridColor: '#21262d',
-    textColor: '#8b949e',
-    cursorAColor: '#ff6b6b',
-    cursorBColor: '#4ecdc4',
-    digitalHighColor: '#39ff14',
-    digitalLowColor: '#333333',
+    background: '#ffffff',
+    gridColor: '#f1f5f9',
+    textColor: '#64748b',
+    cursorAColor: '#ef4444',
+    cursorBColor: '#006064',
+    digitalHighColor: '#00e676',
+    digitalLowColor: '#f1f5f9',
   },
   display: {
     showRmsOverlay: false,

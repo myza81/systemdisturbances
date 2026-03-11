@@ -176,16 +176,16 @@ export const ColumnMapper = ({ file, fileType, onMapComplete, onCancel }) => {
       className={styles.mapperBox}
     >
       <div className={styles.header}>
-        <h3 className="text-sm font-mono font-bold text-text-primary flex items-center gap-2">
-          <RiListCheck2 className="text-accent-cyan" /> 
-          COLUMN MAPPING
+        <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+          <RiListCheck2 className="text-accent-primary" /> 
+          Column Mapping
         </h3>
-        <span className="text-xs text-text-muted font-mono">{columns.length} columns detected</span>
+        <span className="text-xs text-text-muted font-medium">{columns.length} columns detected</span>
       </div>
 
       <div className={styles.timeSelectRow}>
-        <RiTimeLine className="text-accent-cyan" />
-        <span className="text-xs font-mono text-text-muted mr-4">TIME AXIS COLUMN:</span>
+        <RiTimeLine className="text-accent-primary" />
+        <span className="text-[11px] font-bold text-text-muted ml-2 mr-4 uppercase tracking-wider">Time Axis Column:</span>
         <select 
           className={styles.select}
           value={mapping.timeCol}

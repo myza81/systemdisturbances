@@ -1,32 +1,37 @@
 .listContainer {
-  width: 320px;
+  width: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  background: var(--glass-bg);
-  border-right: 1px solid var(--glass-border);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
 
 .header {
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--glass-border);
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-light);
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  background-color: var(--bg-deep);
 }
 
 .scrollArea {
   flex: 1;
   overflow-y: auto;
-  padding: 1rem;
+  padding: 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.25rem;
 }
 
 .item {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
   padding: 0.75rem 1rem;
   border-radius: 0.75rem;
   cursor: pointer;
@@ -35,12 +40,12 @@
 }
 
 .item:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-deep);
 }
 
 .itemActive {
-  background: rgba(0, 242, 255, 0.05);
-  border-color: var(--accent-cyan);
+  background: rgba(0, 96, 100, 0.04);
+  border-color: var(--accent-primary);
 }
 
 .itemIcon {
@@ -49,8 +54,7 @@
 }
 
 .itemActive .itemIcon {
-  color: var(--accent-cyan);
-  filter: drop-shadow(0 0 5px var(--accent-cyan-glow));
+  color: var(--accent-primary);
 }
 
 .itemContent {

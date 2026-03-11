@@ -2,185 +2,225 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px;
-  background: #0d1117;
-  border-bottom: 1px solid #21262d;
-  gap: 12px;
-  min-height: 44px;
+  padding: 0.5rem 1rem;
+  background: var(--bg-deep);
+  border-bottom: 1px solid var(--border-light);
+  gap: 1rem;
+  min-height: 48px;
   flex-shrink: 0;
 }
 
 .infoGroup {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.75rem;
   min-width: 0;
   flex: 1;
 }
 
 .pulseIcon {
-  color: #00f2ff;
-  font-size: 16px;
+  color: var(--accent-primary);
+  font-size: 1.25rem;
   flex-shrink: 0;
 }
 
 .recordInfo {
   display: flex;
-  align-items: baseline;
-  gap: 4px;
+  flex-direction: column;
   overflow: hidden;
 }
 
 .stationName {
-  font-size: 12px;
+  font-size: 0.6rem;
   font-weight: 700;
-  color: #c9d1d9;
-  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
 .deviceId {
-  font-size: 10px;
-  color: #6e7681;
-  font-family: 'JetBrains Mono', monospace;
-  white-space: nowrap;
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 .metaBadges {
   display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-left: 0.5rem;
 }
 
 .badge {
-  font-size: 9px;
-  color: #8b949e;
-  background: #161b22;
-  border: 1px solid #30363d;
-  border-radius: 3px;
-  padding: 1px 5px;
-  font-family: 'JetBrains Mono', monospace;
-  white-space: nowrap;
+  font-size: 0.6rem;
+  color: var(--accent-primary);
+  background: rgba(0, 96, 100, 0.05);
+  border: 1px solid rgba(0, 96, 100, 0.1);
+  border-radius: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 /* Center controls */
 .controlGroup {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 1rem;
   flex-shrink: 0;
 }
 
 .modeToggle {
   display: flex;
-  background: #161b22;
-  border: 1px solid #30363d;
-  border-radius: 6px;
-  overflow: hidden;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 0.5rem;
+  padding: 0.125rem;
+  box-shadow: var(--shadow-sm);
 }
 
 .toggleBtn {
-  padding: 4px 12px;
-  font-size: 10px;
-  font-weight: 600;
-  color: #6e7681;
+  padding: 0.375rem 0.875rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--text-muted);
   background: transparent;
   border: none;
   cursor: pointer;
-  font-family: 'JetBrains Mono', monospace;
-  letter-spacing: 0.05em;
-  transition: all 0.15s;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  transition: all var(--transition-fast);
+  border-radius: 0.375rem;
 }
 
 .toggleBtn:hover {
-  color: #c9d1d9;
-  background: #21262d;
+  color: var(--text-primary);
+  background: var(--bg-deep);
 }
 
 .toggleBtn.active {
-  color: #00f2ff;
-  background: rgba(0, 242, 255, 0.1);
+  color: var(--accent-primary);
+  background: rgba(0, 96, 100, 0.05);
 }
 
 .toggleBtn.activeRms {
-  color: #ff9500;
-  background: rgba(255, 149, 0, 0.1);
+  color: var(--accent-amber);
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.cursorLabel {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
 }
 
 .cursorGroup {
   display: flex;
   align-items: center;
-  gap: 4px;
-}
-
-.cursorLabel {
-  font-size: 9px;
-  color: #6e7681;
-  font-family: 'JetBrains Mono', monospace;
-  text-transform: uppercase;
+  gap: 0.375rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 0.5rem;
+  padding: 0.125rem;
+  box-shadow: var(--shadow-sm);
 }
 
 .cursorBtn {
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  border: 1px solid #30363d;
-  background: #161b22;
-  color: #6e7681;
-  font-size: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 0.375rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.6rem;
   font-weight: 700;
-  font-family: 'JetBrains Mono', monospace;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .cursorBtn:hover {
-  background: #21262d;
-  color: #c9d1d9;
+  background: var(--bg-deep);
+  color: var(--text-primary);
 }
 
 .cursorA.cursorActive {
-  border-color: #ff6b6b;
-  color: #ff6b6b;
-  background: rgba(255, 107, 107, 0.1);
+  border-color: var(--accent-ruby);
+  color: var(--accent-ruby);
+  background: rgba(239, 68, 68, 0.05);
 }
 
 .cursorB.cursorActive {
-  border-color: #4ecdc4;
-  color: #4ecdc4;
-  background: rgba(78, 205, 196, 0.1);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: rgba(0, 96, 100, 0.05);
+}
+
+.scaleGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 0.5rem;
+  padding: 0.125rem 0.625rem;
+  box-shadow: var(--shadow-sm);
+  height: 32px;
+}
+
+.rangeInput {
+  width: 80px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border-light);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.rangeInput::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--accent-primary);
+  border-radius: 50%;
+  transition: transform 0.1s;
+}
+
+.rangeInput::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
 }
 
 /* Right actions */
 .actionGroup {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 0.25rem;
   flex-shrink: 0;
 }
 
 .iconBtn {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 6px;
-  color: #8b949e;
+  border-radius: 0.5rem;
+  color: var(--text-muted);
   cursor: pointer;
-  font-size: 15px;
-  transition: all 0.15s;
+  font-size: 1.125rem;
+  transition: all var(--transition-fast);
 }
 
 .iconBtn:hover {
-  background: #21262d;
-  border-color: #30363d;
-  color: #c9d1d9;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  border-color: var(--border-light);
 }

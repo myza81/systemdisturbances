@@ -37,29 +37,35 @@ import comtrade
 def _detect_phase(channel_name: str) -> str:
     """
     Heuristic to detect the phase of a channel from its name.
-    Checks common naming conventions used in power system IEDs.
+    Checks common naming conventions used in power system IEDs globally.
     Returns 'R', 'Y', 'B', 'N', or '' if unknown.
     """
     name_upper = channel_name.upper()
 
-    # Check for neutral/ground first (to avoid false match on 'N' in other names)
+    # Phase N / Neutral / Ground
+    # Neutral markers often appear at the end or in common abbreviations
     for token in ['_N', '-N', ' N', 'IN', 'VN', 'NEUT', 'GND', 'GROUND', 'ZERO']:
         if token in name_upper:
             return 'N'
 
-    # Red / Phase A
-    for token in ['_R', '-R', ' R', 'IR', 'VR', 'VA', 'IA', '_A', '-A', ' A']:
-        if name_upper.endswith(token) or token + '_' in name_upper:
+    # Phase R / Phase A / L1
+    # Red Phase (Standard for R-Y-B) or Phase A (Standard for A-B-C)
+    for token in ['_R', '-R', ' R', 'IR', 'VR', 'VA', 'IA', '_A', '-A', ' A', 'L1', 'PH1', 'PH-1', '_1', '-1']:
+        if name_upper.endswith(token) or token + '_' in name_upper or token + ' ' in name_upper:
             return 'R'
 
-    # Yellow / Phase B  (some standards use B for Yellow)
-    for token in ['_Y', '-Y', ' Y', 'IY', 'VY', '_B', '-B', ' B', 'IB', 'VB', 'VB', 'IB']:
-        if name_upper.endswith(token) or token + '_' in name_upper:
+    # Phase Y / Phase B / L2
+    # Yellow Phase or Phase B
+    # CAUTION: 'B' can mean Blue or Phase B depending on standard. 
+    # Usually IEDs use A-B-C or R-Y-B. We map Y/B (Phase 2) to 'Y'.
+    for token in ['_Y', '-Y', ' Y', 'IY', 'VY', '_B', '-B', ' B', 'IB', 'VB', 'L2', 'PH2', 'PH-2', '_2', '-2']:
+        if name_upper.endswith(token) or token + '_' in name_upper or token + ' ' in name_upper:
             return 'Y'
 
-    # Blue / Phase C
-    for token in ['_C', '-C', ' C', 'IC', 'VC', 'IBLUE', 'VBLUE']:
-        if name_upper.endswith(token) or token + '_' in name_upper:
+    # Phase B / Phase C / L3
+    # Blue Phase or Phase C
+    for token in ['_C', '-C', ' C', 'IC', 'VC', 'L3', 'PH3', 'PH-3', '_3', '-3', 'IBLUE', 'VBLUE']:
+        if name_upper.endswith(token) or token + '_' in name_upper or token + ' ' in name_upper:
             return 'B'
 
     return ''

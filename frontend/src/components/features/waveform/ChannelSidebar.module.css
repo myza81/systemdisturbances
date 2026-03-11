@@ -1,104 +1,125 @@
 .sidebar {
-  width: 160px;
-  min-width: 140px;
+  width: 150px;
+  min-width: 150px;
   display: flex;
   flex-direction: column;
-  background: #0a0e13;
-  border-right: 1px solid #21262d;
-  overflow-y: auto;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-light);
   flex-shrink: 0;
+  height: 100%;
 }
 
 .timeHeader {
-  padding: 6px 8px;
-  border-bottom: 1px solid #21262d;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: #0d1117;
-  position: sticky;
-  top: 0;
-  z-index: 2;
-}
-
-.timeLabel {
-  font-size: 9px;
-  color: #8b949e;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.timeValue {
-  font-size: 10px;
-  color: #00f2ff;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-weight: 600;
+  /* ... preserved but currently unused ... */
+  display: none;
 }
 
 .channelList {
   display: flex;
   flex-direction: column;
-  padding: 4px 0;
 }
 
 .channelRow {
   display: flex;
   align-items: stretch;
-  min-height: 42px;
-  border-bottom: 1px solid #161b22;
+  border-bottom: 1px solid var(--border-light);
   transition: background 0.15s;
 }
 
 .channelRow:hover {
-  background: #161b22;
+  background: var(--bg-deep);
 }
 
 .colorBar {
-  width: 5px;
+  width: 4px;
   flex-shrink: 0;
-  border-radius: 0 2px 2px 0;
 }
 
 .channelInfo {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: 4px 8px;
-  overflow: hidden;
+  padding: 0.25rem 0.5rem;
   flex: 1;
+  min-width: 0;
+  gap: 0.125rem;
+}
+
+.nameSection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
 }
 
 .channelName {
-  font-size: 9px;
-  color: #8b949e;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.6rem;
+  color: var(--text-primary);
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.channelValue {
-  font-size: 11px;
-  color: #c9d1d9;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-weight: 600;
-  margin-top: 2px;
   white-space: nowrap;
-}
-
-.channelValue.high {
-  color: #39ff14;
-}
-
-.channelValue.low {
-  color: #555555;
 }
 
 .unit {
-  font-size: 9px;
-  color: #6e7681;
-  font-weight: 400;
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.valueSection {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 2px;
+  width: 100%;
+}
+
+.valGroup {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  background: rgba(0,0,0,0.02);
+  min-width: 0;
+  flex: 0 0 calc(50% - 1px);
+}
+
+/* Force the Hover value to its own line */
+.valGroup:nth-child(3) {
+  flex: 0 0 100%;
+}
+
+.valGroup.active {
+  background: rgba(0, 96, 100, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(0, 96, 100, 0.1);
+}
+
+.valLabel {
+  font-size: 0.5rem;
+  color: var(--text-muted);
+  font-weight: 800;
+  width: 8px;
+  text-align: center;
+}
+
+.valText {
+  font-size: 0.55rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+  flex: 1;
+  text-align: right;
+}
+
+.cursorA {
+  color: var(--accent-ruby);
+}
+
+.cursorB {
+  color: var(--accent-primary);
 }

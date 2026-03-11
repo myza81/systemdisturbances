@@ -12,6 +12,7 @@ import styles from './WaveformToolbar.module.css';
 const WaveformToolbar = ({
   mode, onModeChange,
   cursors, onCursorChange,
+  laneHeight, onLaneHeightChange,
   onOpenSettings,
   isFullscreen, onToggleFullscreen,
   delta, meta, data,

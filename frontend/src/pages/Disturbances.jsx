@@ -4,91 +4,91 @@ import DashboardLayout from './DashboardLayout';
 import WaveformViewer from '../components/features/WaveformViewer';
 import FileUploader from '../components/features/FileUploader';
 import DisturbanceList from '../components/features/DisturbanceList';
-import { RiPulseLine, RiFileUploadLine, RiBarChartLine } from 'react-icons/ri';
+import { RiPulseLine, RiFileUploadLine, RiBarChartLine, RiArrowLeftSLine, RiArrowRightSLine } from 'react-icons/ri';
 import styles from './Disturbances.module.css';
 
 const Disturbances = () => {
-  const [activeTab, setActiveTab] = useState('upload');
+  const [activeTab, setActiveTab] = useState('import'); // 'import' | 'repository'
   const [selectedDisturbanceId, setSelectedDisturbanceId] = useState(null);
-
-  const tabs = [
-    { id: 'upload', label: 'FILE UPLOAD', icon: RiFileUploadLine },
-    { id: 'display', label: 'WAVEFORM DISPLAY', icon: RiBarChartLine },
-  ];
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handleUploadSuccess = (result) => {
     if (result && result.id) {
       setSelectedDisturbanceId(result.id);
-      setActiveTab('display');
-    } else {
-      setActiveTab('display');
+      setActiveTab('repository'); // Switch to repository after successful upload
+      setIsCollapsed(false); // Ensure panel is visible to see the list
     }
   };
 
   return (
     <DashboardLayout>
-      <div className={styles.pageWrapper}>
-        <header className={styles.header}>
-          <h1 className={styles.title}>
-            GRID <span className={styles.accent}>DISTURBANCES</span>
-          </h1>
-        </header>
+      <div className={styles.splitLayout}>
+        {/* Left Panel: File Management with Tabs */}
+        <motion.aside 
+          className={styles.leftPanel}
+          animate={{ 
+            width: isCollapsed ? '48px' : '280px',
+            marginRight: isCollapsed ? '0.25rem' : '0.25rem'
+          }}
+          transition={{ duration: 0.3, ease: 'easeInOut' }}
+        >
+          <button 
+            className={styles.collapseToggle}
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          >
+            {isCollapsed ? <RiArrowRightSLine /> : <RiArrowLeftSLine />}
+          </button>
 
-        {/* Tab Navigation */}
-        <div className={styles.tabsContainer}>
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              className={`${styles.tab} ${activeTab === tab.id ? styles.activeTab : ''}`}
-              onClick={() => setActiveTab(tab.id)}
+          <div className={styles.tabHeader} style={{ opacity: isCollapsed ? 0 : 1, pointerEvents: isCollapsed ? 'none' : 'auto' }}>
+            <button 
+              className={`${styles.tabButton} ${activeTab === 'import' ? styles.activeTab : ''}`}
+              onClick={() => setActiveTab('import')}
             >
-              <span className="flex items-center gap-2">
-                <tab.icon />
-                {tab.label}
-              </span>
-              {activeTab === tab.id && (
-                <motion.div 
-                  layoutId="activeTab"
-                  className={styles.activeIndicator}
-                />
-              )}
+              <RiFileUploadLine /> Import
             </button>
-          ))}
-        </div>
+            <button 
+              className={`${styles.tabButton} ${activeTab === 'repository' ? styles.activeTab : ''}`}
+              onClick={() => setActiveTab('repository')}
+            >
+              <RiBarChartLine /> Repository
+            </button>
+          </div>
 
-        {/* Tab Content */}
-        <div className={styles.tabContent}>
-          <AnimatePresence mode="wait">
-            {activeTab === 'upload' ? (
+          <div className={styles.tabContent} style={{ opacity: isCollapsed ? 0 : 1, pointerEvents: isCollapsed ? 'none' : 'auto' }}>
+            <AnimatePresence mode="wait">
+              {activeTab === 'import' ? (
                 <motion.div
-                  key="upload"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.3 }}
-                  style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+                  key="import"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
                 >
                   <FileUploader onUploadSuccess={handleUploadSuccess} />
                 </motion.div>
-            ) : (
-              <motion.div
-                key="display"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex-1 flex min-h-0 overflow-hidden gap-6"
-              >
-                <DisturbanceList 
-                  onSelect={setSelectedDisturbanceId} 
-                  selectedId={selectedDisturbanceId} 
-                />
-                <div className="flex-1 min-w-0 flex flex-col pb-2">
-                  <WaveformViewer disturbanceId={selectedDisturbanceId} />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+              ) : (
+                <motion.div
+                  key="repository"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <DisturbanceList 
+                    onSelect={setSelectedDisturbanceId} 
+                    selectedId={selectedDisturbanceId} 
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </motion.aside>
+
+        {/* Right Panel: Analysis */}
+        <main className={styles.rightPanel}>
+          <WaveformViewer disturbanceId={selectedDisturbanceId} />
+        </main>
       </div>
     </DashboardLayout>
   );

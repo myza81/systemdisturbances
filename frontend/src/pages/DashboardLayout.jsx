@@ -6,9 +6,9 @@ const DashboardLayout = ({ children }) => {
     <div className={styles.layout}>
       <header className={styles.topbar}>
         <div className={styles.logo}>
-          <div className={styles.logoIcon}>P</div>
+          <div className={styles.logoIcon}>G</div>
           <span className={styles.logoText}>
-            POWER<span className={styles.logoTextCore}>CORE</span>
+            GRID DISTURBANCE<span className={styles.logoTextCore}> ANALYZER</span>
           </span>
         </div>
         <div className={styles.userInfo}>
