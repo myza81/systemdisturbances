@@ -1,0 +1,104 @@
+.sidebar {
+  width: 160px;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  background: #0a0e13;
+  border-right: 1px solid #21262d;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.timeHeader {
+  padding: 6px 8px;
+  border-bottom: 1px solid #21262d;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #0d1117;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.timeLabel {
+  font-size: 9px;
+  color: #8b949e;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.timeValue {
+  font-size: 10px;
+  color: #00f2ff;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-weight: 600;
+}
+
+.channelList {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+}
+
+.channelRow {
+  display: flex;
+  align-items: stretch;
+  min-height: 42px;
+  border-bottom: 1px solid #161b22;
+  transition: background 0.15s;
+}
+
+.channelRow:hover {
+  background: #161b22;
+}
+
+.colorBar {
+  width: 5px;
+  flex-shrink: 0;
+  border-radius: 0 2px 2px 0;
+}
+
+.channelInfo {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4px 8px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.channelName {
+  font-size: 9px;
+  color: #8b949e;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.channelValue {
+  font-size: 11px;
+  color: #c9d1d9;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-weight: 600;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.channelValue.high {
+  color: #39ff14;
+}
+
+.channelValue.low {
+  color: #555555;
+}
+
+.unit {
+  font-size: 9px;
+  color: #6e7681;
+  font-weight: 400;
+}

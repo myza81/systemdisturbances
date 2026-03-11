@@ -1,0 +1,122 @@
+.statsGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .statsGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.statCard {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  padding: 1.5rem;
+  border-radius: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  position: relative;
+  overflow: hidden;
+  transition: transform var(--transition-fast);
+  border-bottom: 2px solid transparent;
+}
+
+.statCard:hover {
+  transform: translateY(-4px);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  items-align: flex-start;
+}
+
+.iconWrapper {
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.trend {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-weight: bold;
+}
+
+.trendUp {
+  color: var(--accent-emerald);
+}
+
+.trendDown {
+  color: var(--accent-ruby);
+}
+
+.label {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.valueWrapper {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.value {
+  font-size: 1.875rem;
+  font-family: var(--font-mono);
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.unit {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.glow {
+  position: absolute;
+  right: -1rem;
+  bottom: -1rem;
+  width: 6rem;
+  height: 6rem;
+  border-radius: 9999px;
+  filter: blur(48px);
+  transition: background-color 0.5s;
+  pointer-events: none;
+}
+
+.statCard:hover .glow {
+  opacity: 0.2;
+}
+/* Dynamic accent colors for module classes since we can't easily use tailwind-like arbitrary classes */
+.accentCyan { color: var(--accent-cyan); border-bottom-color: var(--accent-cyan); }
+.accentCyanBg { background-color: rgba(0, 242, 255, 0.1); }
+.accentCyanGlow { background-color: var(--accent-cyan); opacity: 0.05; }
+
+.accentEmerald { color: var(--accent-emerald); border-bottom-color: var(--accent-emerald); }
+.accentEmeraldBg { background-color: rgba(0, 255, 148, 0.1); }
+.accentEmeraldGlow { background-color: var(--accent-emerald); opacity: 0.05; }
+
+.accentAmber { color: var(--accent-amber); border-bottom-color: var(--accent-amber); }
+.accentAmberBg { background-color: rgba(255, 184, 0, 0.1); }
+.accentAmberGlow { background-color: var(--accent-amber); opacity: 0.05; }

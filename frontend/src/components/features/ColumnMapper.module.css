@@ -1,0 +1,147 @@
+.mapperBox {
+  background: var(--bg-deep);
+  border: 1px solid var(--border-active);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin-top: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.header {
+  padding: 12px 16px;
+  background: #11151c;
+  border-bottom: 1px solid var(--glass-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.timeSelectRow {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px dashed var(--glass-border);
+  background: rgba(0, 242, 255, 0.03);
+}
+
+.tableWrap {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-deep);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--glass-border);
+  z-index: 10;
+}
+
+.table td {
+  padding: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.input {
+  width: 100%;
+  background: #161b22;
+  border: 1px solid #30363d;
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  outline: none;
+  font-family: var(--font-mono);
+}
+
+.input:focus {
+  border-color: var(--accent-cyan);
+}
+
+.select {
+  width: 100%;
+  background: #161b22;
+  border: 1px solid #30363d;
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  outline: none;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
+.checkbox {
+  accent-color: var(--accent-cyan);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.footer {
+  padding: 12px 16px;
+  background: #11151c;
+  border-top: 1px solid var(--glass-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.btnPri {
+  background: rgba(0, 242, 255, 0.1);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(0, 242, 255, 0.3);
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btnPri:hover {
+  background: rgba(0, 242, 255, 0.2);
+  border-color: var(--accent-cyan);
+}
+
+.btnSec {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--glass-border);
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btnSec:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}

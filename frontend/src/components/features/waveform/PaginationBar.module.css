@@ -1,0 +1,94 @@
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  background: #0a0e13;
+  border-top: 1px solid #21262d;
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.windowGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.label {
+  font-size: 9px;
+  color: #6e7681;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.windowSelect {
+  background: #161b22;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+}
+
+.windowSelect:hover {
+  border-color: #4488ff;
+}
+
+.navGroup {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.navBtn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #6e7681;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s;
+}
+
+.navBtn:hover:not(:disabled) {
+  background: #21262d;
+  border-color: #30363d;
+  color: #c9d1d9;
+}
+
+.navBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pageInfo {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+
+.pageNum {
+  color: #00f2ff;
+  font-weight: 700;
+}
+
+.pageSep {
+  color: #30363d;
+}
+
+.totalPages {
+  color: #6e7681;
+}

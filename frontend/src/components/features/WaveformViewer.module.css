@@ -1,0 +1,166 @@
+/* WaveformViewer – main container and layout */
+
+.viewerContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: #0d1117;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #21262d;
+  position: relative;
+}
+
+.viewerContainer.fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  border-radius: 0;
+  border: none;
+}
+
+/* Main area: sidebar + chart */
+.mainArea {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Chart wrapper */
+.chartWrapper {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+  background: #0d1117;
+}
+
+.chart {
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+}
+
+/* Loading overlay */
+.loadingOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 17, 23, 0.85);
+  z-index: 10;
+  gap: 10px;
+  color: #8b949e;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.spinner {
+  font-size: 28px;
+  color: #00f2ff;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Error overlay */
+.errorOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 17, 23, 0.9);
+  z-index: 10;
+  color: #ff6b6b;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Bottom bar */
+.bottomBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  background: #0a0e13;
+  border-top: 1px solid #21262d;
+}
+
+/* Delta readout */
+.deltaReadout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background: #0d1117;
+  border-right: 1px solid #21262d;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
+
+.deltaA {
+  color: #ff6b6b;
+  font-weight: 600;
+}
+
+.deltaB {
+  color: #4ecdc4;
+  font-weight: 600;
+}
+
+.deltaSep {
+  color: #484f58;
+}
+
+.deltaDt {
+  color: #c9d1d9;
+  font-weight: 700;
+  background: #161b22;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #30363d;
+}
+
+.clearCursors {
+  font-size: 9px;
+  color: #484f58;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-family: 'JetBrains Mono', monospace;
+  transition: color 0.15s;
+}
+
+.clearCursors:hover {
+  color: #ff6b6b;
+}
+
+/* Empty state */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 300px;
+  gap: 12px;
+}
+
+.emptyIcon {
+  font-size: 40px;
+  color: #30363d;
+}
+
+.emptyText {
+  font-size: 11px;
+  color: #484f58;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.1em;
+}
