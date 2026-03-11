@@ -27,6 +27,7 @@ const ChannelSidebar = ({ channels, hoveredValues, cursorAValues, cursorBValues,
           const valA = cursorAValues?.[ch.name];
           const valB = cursorBValues?.[ch.name];
           const valH = hoverVals?.[ch.name];
+          const deltaVal = (valA !== undefined && valA !== null && valB !== undefined && valB !== null && !isDigital) ? (valB - valA) : null;
           const unit = isDigital ? '' : (ch.unit || '');
 
           return (
@@ -71,6 +72,16 @@ const ChannelSidebar = ({ channels, hoveredValues, cursorAValues, cursorBValues,
                       {formatVal(valH, isDigital)}
                     </span>
                   </div>
+
+                  {/* Delta B-A */}
+                  {!isDigital && (
+                    <div className={styles.valGroup}>
+                      <span className={styles.valLabel}>Δ</span>
+                      <span className={styles.valText}>
+                        {formatVal(deltaVal, false)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

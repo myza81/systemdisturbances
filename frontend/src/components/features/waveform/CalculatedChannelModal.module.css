@@ -101,42 +101,99 @@
 }
 
 .nameInput {
-  width: 120px;
-  padding: 0.375rem 0.5rem;
-  font-size: 0.75rem;
+  width: 140px;
+  padding: 0.5rem;
+  font-size: 0.8rem;
   border: 1px solid var(--border-light);
   border-radius: 0.375rem;
   font-family: inherit;
+  font-weight: 600;
 }
 
-.mathEquation {
+.formulaContainer {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.formulaInputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.formulaInput {
+  width: 100%;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--border-light);
+  border-radius: 0.375rem;
+  font-family: var(--font-mono);
+  background: var(--bg-surface);
+  transition: all 0.2s;
+}
+
+.formulaInput:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.formulaInput.invalid {
+  border-color: var(--accent-ruby);
+  background: #fffafa;
+}
+
+.builderTools {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.toolLabel {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-right: 0.2rem;
+}
+
+.toolBtn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-light);
+  border-radius: 0.25rem;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: all 0.1s;
+}
+
+.toolBtn:hover {
+  background: var(--border-light);
+  border-color: var(--text-muted);
+}
+
+.chSelector {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-light);
+  border-radius: 0.25rem;
+  cursor: pointer;
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.errorMsg {
+  font-size: 0.7rem;
+  color: var(--accent-ruby);
+  margin-top: 0.1rem;
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  background: rgba(255, 255, 255, 0.5);
-  padding: 0.25rem;
-  border-radius: 0.375rem;
-}
-
-.select, .opSelect {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  border: 1px solid transparent;
-  background: transparent;
-  border-radius: 0.25rem;
-  cursor: pointer;
-}
-
-.select {
-  flex: 1;
-  color: var(--text-primary);
-}
-
-.opSelect {
-  font-weight: 700;
-  color: var(--accent-primary);
-  text-align: center;
 }
 
 .colorPicker {

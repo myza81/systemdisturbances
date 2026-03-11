@@ -1,6 +1,6 @@
 .sidebar {
-  width: 150px;
-  min-width: 150px;
+  width: 160px;
+  min-width: 160px;
   display: flex;
   flex-direction: column;
   background: var(--bg-surface);
@@ -86,11 +86,6 @@
   background: rgba(0,0,0,0.02);
   min-width: 0;
   flex: 0 0 calc(50% - 1px);
-}
-
-/* Force the Hover value to its own line */
-.valGroup:nth-child(3) {
-  flex: 0 0 100%;
 }
 
 .valGroup.active {
