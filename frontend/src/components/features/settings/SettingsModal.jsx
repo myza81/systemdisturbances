@@ -10,7 +10,6 @@ import { RiCloseLine, RiPaletteLine, RiContrastLine, RiSettings3Line } from 'rea
 import styles from './SettingsModal.module.css';
 
 const TABS = [
-  { id: 'colors', label: 'Phase Colors', icon: <RiPaletteLine /> },
   { id: 'theme', label: 'Theme', icon: <RiContrastLine /> },
   { id: 'display', label: 'Display', icon: <RiSettings3Line /> },
 ];
@@ -31,7 +30,7 @@ const ColorSwatch = ({ label, value, path, onUpdate }) => (
 );
 
 const SettingsModal = ({ settings, onUpdate, onClose }) => {
-  const [activeTab, setActiveTab] = useState('colors');
+  const [activeTab, setActiveTab] = useState('theme');
 
   return (
     <>
@@ -74,22 +73,6 @@ const SettingsModal = ({ settings, onUpdate, onClose }) => {
 
         {/* Tab Content */}
         <div className={styles.content}>
-          {activeTab === 'colors' && (
-            <section>
-              <p className={styles.sectionNote}>
-                3-phase color coding applied automatically from channel names.
-                These are also used for the waveform lines.
-              </p>
-              <div className={styles.swatchGroup}>
-                <ColorSwatch label="Phase R (Red)"    value={settings.phaseColors.R} path="phaseColors.R" onUpdate={onUpdate} />
-                <ColorSwatch label="Phase Y (Yellow)" value={settings.phaseColors.Y} path="phaseColors.Y" onUpdate={onUpdate} />
-                <ColorSwatch label="Phase B (Blue)"   value={settings.phaseColors.B} path="phaseColors.B" onUpdate={onUpdate} />
-                <ColorSwatch label="Phase N (Neutral/Green)" value={settings.phaseColors.N} path="phaseColors.N" onUpdate={onUpdate} />
-                <ColorSwatch label="Unknown / Other"  value={settings.phaseColors.default} path="phaseColors.default" onUpdate={onUpdate} />
-              </div>
-            </section>
-          )}
-
           {activeTab === 'theme' && (
             <section>
               <p className={styles.sectionNote}>

@@ -40,7 +40,7 @@
 }
 
 .sidebarSpacer {
-  width: 160px; /* fallback */
+  width: 170px; /* Matched to ChannelSidebar width */
   flex-shrink: 0;
   border-right: 1px solid var(--border-light);
 }
@@ -150,6 +150,11 @@
 .calcTitle svg {
   color: var(--accent-primary);
   font-size: 1.1rem;
+}
+
+.headerActions {
+  display: flex;
+  gap: 0.5rem;
 }
 
 .manageBtn {

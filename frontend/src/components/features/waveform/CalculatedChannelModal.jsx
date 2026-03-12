@@ -144,8 +144,8 @@ const CalculatedChannelModal = ({ analogChannels, definitions, onUpdate, onClose
                           }}
                         >
                           <option value="">Channel...</option>
-                          {analogChannels.map(ch => (
-                            <option key={ch.id} value={ch.name}>{ch.name}</option>
+                          {analogChannels.map((ch, idx) => (
+                            <option key={`${ch.id || ch.name}-${idx}`} value={ch.name}>{ch.name}</option>
                           ))}
                         </select>
 

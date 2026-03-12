@@ -24,7 +24,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   RiPulseLine, RiLoader4Line, RiSettings3Line,
   RiDownload2Line, RiFullscreenLine, RiFullscreenExitLine,
-  RiCalculatorLine, RiAddLine,
+  RiCalculatorLine, RiAddLine, RiTableLine,
 } from 'react-icons/ri';
 import { useWaveformData, useChannelMeta } from '../../hooks/useWaveformData';
 import { useSettings } from '../../hooks/useSettings';
@@ -34,6 +34,7 @@ import ZoomSlider from './waveform/ZoomSlider';
 import PaginationBar from './waveform/PaginationBar';
 import SettingsModal from './settings/SettingsModal';
 import CalculatedChannelModal from './waveform/CalculatedChannelModal';
+import ChannelMappingModal from './waveform/ChannelMappingModal';
 import styles from './WaveformViewer.module.css';
 
 // ─── Phase / channel group classification ───────────────────────────────────
@@ -59,8 +60,9 @@ function classifyChannels(analogChannels) {
 
 // ─── Build ECharts option from waveform data ──────────────────────────────
 
-function buildChartOption({ data, settings, cursors, laneHeight = 60 }) {
+function buildChartOption({ data, settings, mergedConfigs, cursors, laneHeight = 60 }) {
   const { theme, phaseColors } = settings;
+  const channelConfigs = mergedConfigs || settings.channelConfigs || {};
   const analog = data.analog || [];
   const digital = data.digital || [];
   const time_ms = data.time_ms || [];
@@ -70,19 +72,44 @@ function buildChartOption({ data, settings, cursors, laneHeight = 60 }) {
 
   // Pre-calculate colors
   const processChannel = (ch, type) => {
-    let color = settings.theme.textColor; // default
-    if (type === 'analog') {
-      color = phaseColors[ch.phase] || phaseColors.default || '#64748b';
-    } else if (type === 'digital') {
-      color = settings.theme.digitalHighColor || '#10b981';
+    const config = channelConfigs[ch.name] || {};
+    
+    // Visibility check
+    if (config.visible === false) return null;
+
+    // Respect existing color if provided (e.g. for calculated channels)
+    // or use mapped color from config
+    let color = ch.color || config.color;
+    
+    if (!color) {
+      if (type === 'analog') {
+        color = phaseColors[ch.phase] || phaseColors.default || '#64748b';
+      } else if (type === 'digital') {
+        color = settings.theme.digitalHighColor || '#10b981';
+      } else {
+        color = settings.theme.textColor;
+      }
     }
-    return { ...ch, type, color };
+    
+    // Scale and title
+    const scale = config.scale || 1;
+    const title = config.title || ch.name;
+    const lineStyleType = config.lineStyle || 'solid';
+
+    return { 
+      ...ch, 
+      type, 
+      color, 
+      displayName: title,
+      scaledValues: ch.values.map(v => v !== null ? v * scale : null),
+      lineStyleType
+    };
   };
 
   const allChannels = [
     ...analog.map(ch => processChannel(ch, 'analog')),
     ...digital.map(ch => processChannel(ch, 'digital'))
-  ];
+  ].filter(Boolean);
 
   const grids = [];
   const xAxes = [];
@@ -90,13 +117,14 @@ function buildChartOption({ data, settings, cursors, laneHeight = 60 }) {
   const series = [];
 
   allChannels.forEach((ch, idx) => {
+    const gridPadding = 8; // Guaranteed gap for stacked lanes
     const gridIdx = idx;
-    const top = idx * laneHeight;
+    const top = idx * laneHeight + gridPadding;
 
     grids.push({
       top: top,
-      height: laneHeight,
-      left: 50,  // Increased for Y-axis labels
+      height: laneHeight - (gridPadding * 2),
+      left: 60, // Ample space for large numeric labels
       right: 20,
       containLabel: false,
     });
@@ -137,46 +165,55 @@ function buildChartOption({ data, settings, cursors, laneHeight = 60 }) {
       });
 
       series.push({
-        name: ch.name,
+        name: ch.displayName || ch.name,
         id: `digital-${idx}-${ch.name}`,
         type: 'line',
         xAxisIndex: gridIdx,
         yAxisIndex: gridIdx,
         step: 'end',
         symbol: 'none',
-        lineStyle: { width: 1.5, color: ch.color },
-        data: time_ms.map((t, i) => [t, ch.values[i]]),
+        lineStyle: { width: 1.5, color: ch.color, type: ch.lineStyleType },
+        data: time_ms.map((t, i) => [t, ch.scaledValues[i]]),
         z: 3,
       });
     } else {
       yAxes.push({
         type: 'value',
         gridIndex: gridIdx,
+        splitNumber: Math.max(2, Math.floor(laneHeight / 45)), // Much sparser
+        boundaryGap: ['5%', '5%'],
         axisLabel: { 
           show: true,
+          showMinLabel: false,
+          showMaxLabel: false,
           color: theme.textColor,
-          fontSize: 9,
+          fontSize: 7.5, // Tiny for high density
           hideOverlap: true,
-          formatter: (v) => Number(v).toFixed(1)
+          margin: 10, // More horizontal space
+          formatter: (v) => {
+            const absV = Math.abs(v);
+            if (absV >= 1000) return (v / 1000).toFixed(1) + 'k';
+            if (absV === 0) return '0';
+            return Number.isInteger(v) ? v.toString() : v.toFixed(1);
+          }
         },
         splitLine: { 
           show: true, 
-          interval: 100000, 
-          lineStyle: { color: theme.gridColor, type: 'solid', opacity: 0.3 } 
+          lineStyle: { color: theme.gridColor, type: 'solid', opacity: 0.1 } 
         },
         axisLine: { show: false },
         axisTick: { show: true, lineStyle: { color: theme.gridColor } },
       });
 
       series.push({
-        name: ch.name,
+        name: ch.displayName || ch.name,
         type: 'line',
         xAxisIndex: gridIdx,
         yAxisIndex: gridIdx,
         symbol: 'none',
         sampling: 'lttb',
-        lineStyle: { width: 1.5, color: ch.color },
-        data: time_ms.map((t, i) => [t, ch.values[i] ?? null]),
+        lineStyle: { width: 1.5, color: ch.color, type: ch.lineStyleType },
+        data: time_ms.map((t, i) => [t, ch.scaledValues[i] ?? null]),
         z: 3,
       });
     }
@@ -277,6 +314,7 @@ const WaveformViewer = ({ disturbanceId }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showCalculatedModal, setShowCalculatedModal] = useState(false);
+  const [showMappingModal, setShowMappingModal] = useState(false);
   const [view, setView] = useState('raw'); 
   const [calculatedDefinitions, setCalculatedDefinitions] = useState([]);
 
@@ -286,17 +324,67 @@ const WaveformViewer = ({ disturbanceId }) => {
   const rawResult = useWaveformData(disturbanceId, rawPage, rawWindowMs, mode);
   const calcBaseResult = useWaveformData(disturbanceId, calcPage, calcWindowMs, mode);
 
-  const { meta } = useChannelMeta(disturbanceId);
+  const { meta, loading: metaLoading, refetch: refetchMeta } = useChannelMeta(disturbanceId);
   const { settings, updateSettings, getPhaseColor } = useSettings();
 
-  // Derive display channels
+  // Merged configurations: Record-level (from backend) + App-level (local settings)
+  const mergedConfigs = useMemo(() => {
+    const recordConfigs = {};
+    if (meta) {
+      [...(meta.analog || []), ...(meta.digital || [])].forEach(ch => {
+        recordConfigs[ch.name] = {
+          title: ch.title,
+          color: ch.color,
+          scale: ch.scale,
+          visible: ch.visible
+        };
+      });
+    }
+    return { ...settings.channelConfigs, ...recordConfigs };
+  }, [meta, settings.channelConfigs]);
+
+  // Derive display channels for the sidebar
   const allChannels = useMemo(() => {
     const data = rawResult.data;
     if (!data) return [];
-    const digitalWithColor = (data.digital || []).map(ch => ({ ...ch, color: settings.theme.digitalHighColor, type: 'digital' }));
-    const analogWithColor = (data.analog || []).map(ch => ({ ...ch, color: getPhaseColor(ch.phase), type: 'analog' }));
+    
+    const digitalWithColor = (data.digital || [])
+      .map(ch => {
+        const config = mergedConfigs[ch.name] || {};
+        if (config.visible === false) return null;
+        return { 
+          ...ch, 
+          title: config.title || ch.name,
+          color: config.color || settings.theme.digitalHighColor, 
+          type: 'digital',
+          values: config.scale ? ch.values.map(v => v * config.scale) : ch.values
+        };
+      })
+      .filter(Boolean);
+
+    const analogWithColor = (data.analog || [])
+      .map(ch => {
+        const config = mergedConfigs[ch.name] || {};
+        if (config.visible === false) return null;
+        
+        let unitPrefix = '';
+        if (config.scale === 0.001) unitPrefix = 'k';
+        if (config.scale === 0.000001) unitPrefix = 'M';
+        const displayUnit = ch.unit ? `${unitPrefix}${ch.unit}` : '';
+
+        return { 
+          ...ch, 
+          title: config.title || ch.name,
+          unit: displayUnit,
+          color: config.color || getPhaseColor(ch.phase), 
+          type: 'analog',
+          values: config.scale ? ch.values.map(v => v !== null ? v * config.scale : null) : ch.values
+        };
+      })
+      .filter(Boolean);
+
     return [...analogWithColor, ...digitalWithColor];
-  }, [rawResult.data, getPhaseColor, settings.theme.digitalHighColor]);
+  }, [rawResult.data, getPhaseColor, settings.theme.digitalHighColor, mergedConfigs]);
 
   // compute engine for calculated channels
   const calculatedData = useMemo(() => {
@@ -354,7 +442,7 @@ const WaveformViewer = ({ disturbanceId }) => {
   useEffect(() => {
     if (!calculatedData || !calcChartRef.current || view !== 'advanced') return;
     if (!calcChartInstance.current) calcChartInstance.current = echarts.init(calcChartRef.current, null, { renderer: 'canvas' });
-    const option = buildChartOption({ data: calculatedData, settings, cursors, laneHeight: calcLaneHeight });
+    const option = buildChartOption({ data: calculatedData, settings, mergedConfigs, cursors, laneHeight: calcLaneHeight });
     calcChartInstance.current.setOption(option, { notMerge: true });
 
     // Cursor click handler
@@ -416,7 +504,7 @@ const WaveformViewer = ({ disturbanceId }) => {
     const data = rawResult.data;
     if (!data || !chartRef.current) return;
     if (!chartInstance.current) chartInstance.current = echarts.init(chartRef.current, null, { renderer: 'canvas' });
-    const option = buildChartOption({ data, settings, cursors, laneHeight: rawLaneHeight });
+    const option = buildChartOption({ data, settings, mergedConfigs, cursors, laneHeight: rawLaneHeight });
     chartInstance.current.setOption(option, { notMerge: true });
 
     const zr = chartInstance.current.getZr();
@@ -490,7 +578,12 @@ const WaveformViewer = ({ disturbanceId }) => {
     setCalcPage(1);
     setCursors({ A: null, B: null, active: 'A' });
     setHoveredValues({});
-  }, [disturbanceId]);
+    
+    // Auto-prompt mapping if no config exists for this record
+    if (disturbanceId && meta && !meta.has_config) {
+      setShowMappingModal(true);
+    }
+  }, [disturbanceId, meta]);
 
   useEffect(() => {
     if (view === 'raw' && chartInstance.current) setTimeout(() => chartInstance.current.resize(), 0);
@@ -549,7 +642,9 @@ const WaveformViewer = ({ disturbanceId }) => {
     <div className={`${styles.viewerContainer} ${isFullscreen ? styles.fullscreen : ''}`}>
       <WaveformToolbar
         mode={mode} onModeChange={setMode} laneHeight={currentLaneHeight} onLaneHeightChange={setLaneHeight}
-        onOpenSettings={() => setShowSettings(true)} isFullscreen={isFullscreen} onToggleFullscreen={() => setIsFullscreen(f => !f)}
+        onOpenSettings={() => setShowSettings(true)}
+        onOpenMapping={() => setShowMappingModal(true)}
+        isFullscreen={isFullscreen} onToggleFullscreen={() => setIsFullscreen(f => !f)}
         cursors={cursors} onCursorChange={setCursors} delta={delta} meta={meta} data={currentData}
       />
 
@@ -584,7 +679,9 @@ const WaveformViewer = ({ disturbanceId }) => {
       <div className={styles.viewContent} style={{ display: view === 'advanced' ? 'flex' : 'none' }}>
         <div className={styles.calculatedHeader}>
           <div className={styles.calcTitle}><RiCalculatorLine /><span>Virtual Waveforms</span></div>
-          <button className={styles.manageBtn} onClick={() => setShowCalculatedModal(true)}><RiSettings3Line /> Manage Calculations</button>
+          <div className={styles.headerActions}>
+            <button className={styles.manageBtn} onClick={() => setShowCalculatedModal(true)}><RiSettings3Line /> Manage Calculations</button>
+          </div>
         </div>
 
         {calculatedDefinitions.length > 0 ? (
@@ -641,6 +738,7 @@ const WaveformViewer = ({ disturbanceId }) => {
 
       <AnimatePresence>
         {showCalculatedModal && <CalculatedChannelModal analogChannels={rawResult.data?.analog || []} definitions={calculatedDefinitions} onUpdate={setCalculatedDefinitions} onClose={() => setShowCalculatedModal(false)} />}
+        {showMappingModal && <ChannelMappingModal disturbanceId={disturbanceId} analogChannels={rawResult.data?.analog || []} digitalChannels={rawResult.data?.digital || []} configs={settings.channelConfigs} onUpdate={updateSettings} onSaveSuccess={refetchMeta} onClose={() => setShowMappingModal(false)} settings={settings} />}
         {showSettings && <SettingsModal settings={settings} onUpdate={updateSettings} onClose={() => setShowSettings(false)} />}
       </AnimatePresence>
     </div>

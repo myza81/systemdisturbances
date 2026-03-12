@@ -40,7 +40,7 @@ export function useChannelMeta(disturbanceId) {
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  const fetchMeta = useCallback(() => {
     if (!disturbanceId) return;
     setLoading(true);
     fetch(`${API_BASE}/disturbances/${disturbanceId}/channels/`)
@@ -50,5 +50,9 @@ export function useChannelMeta(disturbanceId) {
       .finally(() => setLoading(false));
   }, [disturbanceId]);
 
-  return { meta, loading };
+  useEffect(() => {
+    fetchMeta();
+  }, [fetchMeta]);
+
+  return { meta, loading, refetch: fetchMeta };
 }

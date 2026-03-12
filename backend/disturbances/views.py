@@ -9,6 +9,7 @@ Endpoints:
   GET  /api/v1/disturbances/<id>/rms/                 – per-cycle RMS for analog channels
   GET  /api/v1/disturbances/<id>/channels/            – channel metadata only (no raw values)
   PATCH /api/v1/disturbances/<id>/channel-config/     – save user channel settings
+  POST /api/v1/disturbances/scan/                     – scan file(s) and return metadata/channels
   GET  /api/v1/settings/                              – read app settings
   POST /api/v1/settings/                              – write/update app settings
 """
@@ -70,6 +71,7 @@ def list_disturbances(request):
             'file_size': r.file_size,
             'sample_rate': r.sample_rate,
             'nominal_frequency': r.nominal_frequency,
+            'has_config': r.channel_config is not None and len(r.channel_config) > 0,
         })
     return Response(data)
 
@@ -80,6 +82,17 @@ def get_disturbance_detail(request, pk):
     try:
         record = DisturbanceRecord.objects.get(pk=pk)
         return Response(DisturbanceUploadSerializer(record).data)
+    except DisturbanceRecord.DoesNotExist:
+        return Response({'error': 'Record not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['DELETE'])
+def delete_disturbance(request, pk):
+    """Deletes a record."""
+    try:
+        record = DisturbanceRecord.objects.get(pk=pk)
+        record.delete()
+        return Response({'status': 'deleted'}, status=status.HTTP_204_NO_CONTENT)
     except DisturbanceRecord.DoesNotExist:
         return Response({'error': 'Record not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -163,6 +176,14 @@ def upload_disturbance(request):
 
     # ── Save record ──
     name = request.data.get('name') or primary_file.name
+    channel_config_raw = request.data.get('channel_config')
+    channel_config = None
+    if channel_config_raw:
+        try:
+            channel_config = json.loads(channel_config_raw)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     record = DisturbanceRecord.objects.create(
         source_type=source_type,
         name=name,
@@ -174,6 +195,7 @@ def upload_disturbance(request):
         sample_rate=data_payload.get('sample_rate'),
         nominal_frequency=data_payload.get('frequency', 50.0),
         metadata=_meta if _meta else None,
+        channel_config=channel_config
     )
 
     return Response({
@@ -186,6 +208,69 @@ def upload_disturbance(request):
         'digital_count': len(data_payload.get('digital', [])),
         'sample_count': len(data_payload.get('time', [])),
     }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
+def scan_disturbance(request):
+    """
+    Parses a disturbance file and returns channel metadata WITHOUT saving a record.
+    Used for the 'assisted' mapping flow.
+    """
+    import json
+    source_type = request.data.get('source_type', '').upper()
+    primary_file = request.FILES.get('primary_file')
+    auxiliary_file = request.FILES.get('auxiliary_file')
+    column_map_raw = request.data.get('column_map')
+
+    if not primary_file:
+        return Response({'error': 'No data file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    column_map = None
+    if column_map_raw:
+        try:
+            column_map = json.loads(column_map_raw)
+        except: pass
+
+    try:
+        if source_type == 'COMTRADE':
+            if not auxiliary_file:
+                return Response({'error': 'COMTRADE requires .cfg and .dat'}, status=400)
+            data_payload = parse_comtrade(auxiliary_file, primary_file)
+        elif source_type == 'CSV':
+            data_payload = parse_csv(primary_file, column_map=column_map)
+        elif source_type == 'EXCEL':
+            sheet_name = request.data.get('sheet_name')
+            data_payload = parse_excel(primary_file, column_map=column_map, sheet_name=sheet_name)
+        else:
+            return Response({'error': f'Unsupported: {source_type}'}, status=400)
+    except Exception as e:
+        return Response({'error': str(e)}, status=422)
+
+    # Prepare metadata response
+    analog = []
+    for ch in data_payload.get('analog', []):
+        analog.append({
+            'name': ch['name'],
+            'unit': ch.get('unit', ''),
+            'phase': ch.get('phase', ''),
+        })
+
+    digital = []
+    for ch in data_payload.get('digital', []):
+        digital.append({
+            'name': ch['name'],
+        })
+
+    return Response({
+        'source_type': source_type,
+        'station': data_payload.get('station', ''),
+        'device': data_payload.get('device', ''),
+        'sample_rate': data_payload.get('sample_rate'),
+        'nominal_frequency': data_payload.get('frequency', 50.0),
+        'analog': analog,
+        'digital': digital,
+    })
 
 
 # ─── Waveform (paginated) ─────────────────────────────────────────────────────
@@ -347,7 +432,7 @@ def get_channels(request, pk):
             'name': ch['name'],
             'unit': ch.get('unit', ''),
             'phase': ch.get('phase', ''),
-            'label': cfg.get('label', ch['name']),
+            'title': cfg.get('title', ch['name']),
             'color': cfg.get('color', ''),
             'scale': cfg.get('scale', 1.0),
             'visible': cfg.get('visible', True),
@@ -358,7 +443,7 @@ def get_channels(request, pk):
         cfg = channel_config.get(ch['name'], {})
         digital.append({
             'name': ch['name'],
-            'label': cfg.get('label', ch['name']),
+            'title': cfg.get('title', ch['name']),
             'color': cfg.get('color', ''),
             'visible': cfg.get('visible', True),
         })
@@ -371,6 +456,7 @@ def get_channels(request, pk):
         'trigger_time': record.trigger_time,
         'total_samples': len(payload.get('time', [])),
         'nominal_frequency': record.nominal_frequency,
+        'has_config': record.channel_config is not None and len(record.channel_config) > 0,
         'analog': analog,
         'digital': digital,
     })

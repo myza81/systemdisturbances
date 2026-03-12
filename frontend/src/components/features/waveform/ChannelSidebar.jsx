@@ -43,46 +43,42 @@ const ChannelSidebar = ({ channels, hoveredValues, cursorAValues, cursorBValues,
               <div className={styles.channelInfo}>
                 <div className={styles.nameSection}>
                   <span className={styles.channelName} title={ch.name}>
-                    {ch.name}
+                    {ch.title || ch.name}
                   </span>
                   {unit && <span className={styles.unit}>{unit}</span>}
                 </div>
                 
-                <div className={styles.valueSection}>
-                  {/* Cursor A */}
-                  <div className={`${styles.valGroup} ${active === 'A' ? styles.active : ''}`}>
-                    <span className={styles.valLabel}>A</span>
-                    <span className={`${styles.valText} ${styles.cursorA}`}>
-                      {formatVal(valA, isDigital)}
-                    </span>
-                  </div>
-                  
-                  {/* Cursor B */}
-                  <div className={`${styles.valGroup} ${active === 'B' ? styles.active : ''}`}>
-                    <span className={styles.valLabel}>B</span>
-                    <span className={`${styles.valText} ${styles.cursorB}`}>
-                      {formatVal(valB, isDigital)}
-                    </span>
-                  </div>
-
-                  {/* Real-time Hover/Active Tracking */}
-                  <div className={styles.valGroup}>
-                    <span className={styles.valLabel}>H</span>
-                    <span className={styles.valText}>
-                      {formatVal(valH, isDigital)}
-                    </span>
-                  </div>
-
-                  {/* Delta B-A */}
-                  {!isDigital && (
-                    <div className={styles.valGroup}>
-                      <span className={styles.valLabel}>Δ</span>
-                      <span className={styles.valText}>
-                        {formatVal(deltaVal, false)}
-                      </span>
+                {laneHeight >= 50 && (
+                  <div className={styles.valueSection}>
+                    <div className={styles.topRow}>
+                      {/* Cursor A */}
+                      <div className={`${styles.valGroup} ${active === 'A' ? styles.active : ''}`}>
+                        <span className={styles.valLabel}>A</span>
+                        <span className={`${styles.valText} ${styles.cursorA}`}>
+                          {formatVal(valA, isDigital)}
+                        </span>
+                      </div>
+                      
+                      {/* Cursor B */}
+                      <div className={`${styles.valGroup} ${active === 'B' ? styles.active : ''}`}>
+                        <span className={styles.valLabel}>B</span>
+                        <span className={`${styles.valText} ${styles.cursorB}`}>
+                          {formatVal(valB, isDigital)}
+                        </span>
+                      </div>
                     </div>
-                  )}
-                </div>
+
+                    <div className={styles.bottomRow}>
+                       {/* Real-time Hover Tracking */}
+                      <div className={styles.valGroup}>
+                        <span className={styles.valLabel}>H</span>
+                        <span className={styles.valText}>
+                          {formatVal(valH, isDigital)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           );

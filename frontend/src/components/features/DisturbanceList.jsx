@@ -5,19 +5,24 @@ import {
   RiPulseLine, 
   RiDeleteBinLine, 
   RiTimeLine,
-  RiCheckDoubleLine
+  RiCheckDoubleLine,
+  RiRefreshLine,
+  RiAlertLine
 } from 'react-icons/ri';
 import styles from './DisturbanceList.module.css';
 
 const DisturbanceList = ({ onSelect, selectedId }) => {
   const [disturbances, setDisturbances] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchDisturbances();
   }, []);
 
   const fetchDisturbances = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const response = await fetch('/api/v1/disturbances/all/');
       
@@ -26,18 +31,34 @@ const DisturbanceList = ({ onSelect, selectedId }) => {
       }
 
       const text = await response.text();
-      if (!text) {
-        setDisturbances([]);
-        return;
-      }
-
-      const data = JSON.parse(text);
+      const data = text ? JSON.parse(text) : [];
       setDisturbances(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch disturbances:', error);
-      // Optional: set an error state to show in the UI
+      setError('Failed to load captures. Please check your connection.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (e, id) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this recording?')) return;
+
+    try {
+      const response = await fetch(`/api/v1/disturbances/${id}/delete/`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setDisturbances(prev => prev.filter(d => d.id !== id));
+        if (selectedId === id) onSelect(null);
+      } else {
+        alert('Failed to delete record.');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Error deleting record.');
     }
   };
 
@@ -46,36 +67,78 @@ const DisturbanceList = ({ onSelect, selectedId }) => {
   return (
     <div className={styles.listContainer}>
       <div className={styles.header}>
-        <RiHistoryLine className="text-accent-primary" />
-        <span className="font-bold text-xs tracking-wider uppercase opacity-70">Capture Repository</span>
+        <div className={styles.headerIcon}>
+          <RiHistoryLine />
+        </div>
+        <div className={styles.headerText}>
+          <h3 className={styles.headerTitle}>Capture Repository</h3>
+          <span className={styles.headerSubtitle}>Signal Library</span>
+        </div>
+        <button 
+          className={styles.refreshBtn} 
+          onClick={fetchDisturbances}
+          disabled={loading}
+          title="Refresh repository"
+        >
+          <RiRefreshLine className={loading ? 'animate-spin' : ''} />
+        </button>
       </div>
 
       <div className={styles.scrollArea}>
-        {disturbances.length === 0 ? (
+        {error ? (
+          <div className={styles.errorContainer}>
+            <RiAlertLine size={24} />
+            <p>{error}</p>
+            <button onClick={fetchDisturbances} className={styles.retryBtn}>Retry</button>
+          </div>
+        ) : loading && disturbances.length === 0 ? (
+          <div className={styles.empty}>
+            <RiPulseLine className="animate-pulse" size={24} style={{ opacity: 0.3, marginBottom: '0.5rem' }} />
+            <p>Scanning signals...</p>
+          </div>
+        ) : disturbances.length === 0 ? (
           <div className={styles.empty}>
             <p>No captures found.</p>
           </div>
         ) : (
-          disturbances.map((item) => (
+          disturbances.map((item, idx) => (
             <motion.div
               key={item.id}
-              whileHover={{ x: 2 }}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: idx * 0.05 }}
               className={`${styles.item} ${selectedId === item.id ? styles.itemActive : ''}`}
               onClick={() => onSelect(item.id)}
             >
-              <div className={styles.itemIcon}>
-                <RiPulseLine />
-              </div>
-              <div className={styles.itemContent}>
-                <h4 className={styles.itemName}>{item.name}</h4>
-                <div className={styles.itemMeta}>
-                  <span className="flex items-center gap-1"><RiTimeLine size={10} /> {new Date(item.timestamp).toLocaleDateString()}</span>
-                  <span className="border-l border-border-light pl-2 uppercase">{item.source_type}</span>
+              <div className={styles.cardContent}>
+                <div className={styles.titleRow}>
+                  <div className={styles.primaryMeta}>
+                    <span className={styles.metaDate}>{item.name ? item.name.replace(/\.[^/.]+$/, "") : "Untitled"}</span>
+                  </div>
+                  <div className={styles.statusGroup}>
+                    {!item.has_config && (
+                      <span className={`${styles.statusBadge} ${styles.pending}`}>Pending</span>
+                    )}
+                    <button 
+                      className={styles.deleteBtn}
+                      onClick={(e) => handleDelete(e, item.id)}
+                      title="Delete recording"
+                    >
+                      <RiDeleteBinLine />
+                    </button>
+                    {selectedId === item.id && (
+                      <RiCheckDoubleLine className={styles.activeCheck} />
+                    )}
+                  </div>
+                </div>
+                <div className={styles.metaRow}>
+                  <span className={styles.metaDateSmall}>{new Date(item.timestamp).toLocaleDateString()}</span>
+                  <span className={styles.metaSeparator}>•</span>
+                  <span className={styles.metaType}>{item.source_type}</span>
+                  <span className={styles.metaSeparator}>•</span>
+                  <span className={styles.metaValue}>{(item.file_size / 1024).toFixed(0)}KB</span>
                 </div>
               </div>
-              {selectedId === item.id && (
-                <RiCheckDoubleLine className="text-accent-primary ml-auto" />
-              )}
             </motion.div>
           ))
         )}

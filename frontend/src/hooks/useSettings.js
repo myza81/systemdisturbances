@@ -8,13 +8,6 @@ import { useState, useEffect, useCallback } from 'react';
 const API_BASE = 'http://localhost:8000/api/v1';
 
 export const DEFAULT_SETTINGS = {
-  phaseColors: {
-    R: '#ef4444',
-    Y: '#f59e0b',
-    B: '#3b82f6',
-    N: '#10b981',
-    default: '#64748b',
-  },
   theme: {
     background: '#ffffff',
     gridColor: '#f1f5f9',
@@ -28,6 +21,7 @@ export const DEFAULT_SETTINGS = {
     showRmsOverlay: false,
     defaultWindowMs: 500,
   },
+  channelConfigs: {}, // Stores per-channel mapping (visibility, title, color, scale, style)
 };
 
 const STORAGE_KEY = 'waveform_app_settings';
@@ -76,14 +70,6 @@ export function useSettings() {
     });
   }, []);
 
-  const getPhaseColor = useCallback(
-    (phase) => {
-      if (!phase) return settings.phaseColors.default;
-      return settings.phaseColors[phase] || settings.phaseColors.default;
-    },
-    [settings.phaseColors]
-  );
-
   // Sync to backend (non-blocking, best effort)
   const syncToBackend = useCallback(async () => {
     try {
@@ -97,5 +83,5 @@ export function useSettings() {
     }
   }, [settings]);
 
-  return { settings, updateSettings, getPhaseColor, syncToBackend };
+  return { settings, updateSettings, syncToBackend };
 }

@@ -5,7 +5,7 @@
 import React from 'react';
 import {
   RiPulseLine, RiSettings3Line, RiFullscreenLine, RiFullscreenExitLine,
-  RiDownload2Line, RiCursorLine,
+  RiDownload2Line, RiCursorLine, RiTableLine,
 } from 'react-icons/ri';
 import styles from './WaveformToolbar.module.css';
 
@@ -14,6 +14,7 @@ const WaveformToolbar = ({
   cursors, onCursorChange,
   laneHeight, onLaneHeightChange,
   onOpenSettings,
+  onOpenMapping,
   isFullscreen, onToggleFullscreen,
   delta, meta, data,
 }) => {
@@ -84,6 +85,9 @@ const WaveformToolbar = ({
 
       {/* Right – action buttons */}
       <div className={styles.actionGroup}>
+        <button className={styles.iconBtn} onClick={onOpenMapping} title="Channel Mapping">
+          <RiTableLine />
+        </button>
         <button className={styles.iconBtn} onClick={onOpenSettings} title="Settings">
           <RiSettings3Line />
         </button>

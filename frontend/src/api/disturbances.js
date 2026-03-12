@@ -15,6 +15,19 @@ export const uploadDisturbance = async (formData) => {
   }
 };
 
+export const scanDisturbance = async (formData) => {
+  try {
+    const response = await axios.post(`${API_BASE}/disturbances/scan/`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
 /**
  * Calculates SHA-256 hash of a file locally for pre-upload validation
  */

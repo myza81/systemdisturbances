@@ -191,7 +191,7 @@ export const ColumnMapper = ({ file, fileType, onMapComplete, onCancel }) => {
           value={mapping.timeCol}
           onChange={(e) => setMapping(prev => ({ ...prev, timeCol: e.target.value }))}
         >
-          {columns.map(c => <option key={c} value={c}>{c}</option>)}
+          {columns.map((c, idx) => <option key={`${c}-${idx}`} value={c}>{c}</option>)}
         </select>
       </div>
 
@@ -207,13 +207,13 @@ export const ColumnMapper = ({ file, fileType, onMapComplete, onCancel }) => {
             </tr>
           </thead>
           <tbody>
-            {columns.map(col => {
+            {columns.map((col, idx) => {
               if (col === mapping.timeCol) return null;
               const cfg = mapping.channels[col];
               if (!cfg) return null;
 
               return (
-                <tr key={col} className={!cfg.include ? 'opacity-50' : ''}>
+                <tr key={`${col}-${idx}`} className={!cfg.include ? 'opacity-50' : ''}>
                   <td className="text-center">
                     <input 
                       type="checkbox" 

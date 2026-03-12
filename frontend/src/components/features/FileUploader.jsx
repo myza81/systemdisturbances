@@ -16,15 +16,17 @@ import {
   RiAddLine
 } from 'react-icons/ri';
 import styles from './FileUploader.module.css';
-import { uploadDisturbance } from '../../api/disturbances';
+import { uploadDisturbance, scanDisturbance } from '../../api/disturbances';
 import { ColumnMapper } from './ColumnMapper';
+import ChannelMappingModal from './waveform/ChannelMappingModal';
 
 const FileUploader = ({ onUploadSuccess }) => {
   const [ingestionType, setIngestionType] = useState(null); // 'COMTRADE', 'CSV', 'EXCEL'
   const [currentPackage, setCurrentPackage] = useState({}); // { primary: File, auxiliary: File }
-  const [packageQueue, setPackageQueue] = useState([]); // Array of packages ready to ingest
   const [mappingTarget, setMappingTarget] = useState(null); // { file, type }
+  const [scanTarget, setScanTarget] = useState(null); // { scanData, pkgInfo }
   const [isUploading, setIsUploading] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
   const [status, setStatus] = useState(null);
   const [activeSlot, setActiveSlot] = useState(null);
   
@@ -49,7 +51,7 @@ const FileUploader = ({ onUploadSuccess }) => {
     setCurrentPackage(prev => ({ ...prev, [slot]: file }));
   };
 
-  const addToQueue = () => {
+  const addToQueue = async () => {
     const isComtrade = ingestionType === 'COMTRADE';
     const isValid = isComtrade 
       ? (currentPackage.primary && currentPackage.auxiliary)
@@ -58,73 +60,92 @@ const FileUploader = ({ onUploadSuccess }) => {
     if (!isValid) return;
 
     if (!isComtrade) {
-      // CSV and Excel need column mapping
+      // CSV and Excel need column mapping first
       setMappingTarget({ file: currentPackage.primary, type: ingestionType });
       return;
     }
 
-    const newPackage = {
-      id: Math.random().toString(36).substr(2, 9),
-      type: ingestionType,
-      primary: currentPackage.primary,
-      auxiliary: currentPackage.auxiliary,
-      name: currentPackage.primary.name.split('.')[0]
-    };
-
-    setPackageQueue(prev => [...prev, newPackage]);
-    resetIngestion();
+    // COMTRADE: Scan immediately
+    setIsScanning(true);
+    setStatus(null);
+    try {
+      const formData = new FormData();
+      formData.append('source_type', ingestionType);
+      formData.append('primary_file', currentPackage.primary);
+      formData.append('auxiliary_file', currentPackage.auxiliary);
+      const scanData = await scanDisturbance(formData);
+      setScanTarget({ 
+        scanData, 
+        pkgInfo: { 
+          type: ingestionType, 
+          primary: currentPackage.primary, 
+          auxiliary: currentPackage.auxiliary,
+          name: currentPackage.primary.name.split('.')[0]
+        } 
+      });
+    } catch (err) {
+      setStatus({ type: 'error', message: 'Failed to scan channel metadata.' });
+    } finally {
+      setIsScanning(false);
+    }
   };
 
-  const handleMapComplete = (columnMap) => {
-    const newPackage = {
-      id: Math.random().toString(36).substr(2, 9),
-      type: mappingTarget.type,
-      primary: mappingTarget.file,
-      auxiliary: null,
-      name: mappingTarget.file.name.split('.')[0],
-      columnMap: columnMap
-    };
-    setPackageQueue(prev => [...prev, newPackage]);
-    setMappingTarget(null);
-    resetIngestion();
+  const handleMapComplete = async (columnMap) => {
+    // After column mapping (CSV/Excel), we need to scan to get detected channels
+    setIsScanning(true);
+    try {
+      const formData = new FormData();
+      formData.append('source_type', mappingTarget.type);
+      formData.append('primary_file', mappingTarget.file);
+      formData.append('column_map', JSON.stringify(columnMap));
+      const scanData = await scanDisturbance(formData);
+      
+      setScanTarget({
+        scanData,
+        pkgInfo: {
+          type: mappingTarget.type,
+          primary: mappingTarget.file,
+          auxiliary: null,
+          name: mappingTarget.file.name.split('.')[0],
+          columnMap: columnMap
+        }
+      });
+      setMappingTarget(null);
+    } catch (err) {
+      setStatus({ type: 'error', message: 'Failed to scan channel metadata.' });
+    } finally {
+      setIsScanning(false);
+    }
   };
 
-  const removeQueuedPackage = (id) => {
-    setPackageQueue(prev => prev.filter(p => p.id !== id));
-  };
-
-  const handleFinalIngest = async () => {
-    if (packageQueue.length === 0) return;
-    
+  const handleChannelConfigComplete = async (channelConfig) => {
+    const pkg = scanTarget.pkgInfo;
     setIsUploading(true);
     setStatus(null);
+    setScanTarget(null); // Close modal
 
     try {
-      let firstResult = null;
-      for (const pkg of packageQueue) {
-        const formData = new FormData();
-        formData.append('source_type', pkg.type);
-        formData.append('primary_file', pkg.primary);
-        if (pkg.auxiliary) {
-          formData.append('auxiliary_file', pkg.auxiliary);
-        }
-        if (pkg.columnMap) {
-          formData.append('column_map', JSON.stringify(pkg.columnMap));
-        }
-        
-        const result = await uploadDisturbance(formData);
-        if (!firstResult) firstResult = result;
+      const formData = new FormData();
+      formData.append('source_type', pkg.type);
+      formData.append('primary_file', pkg.primary);
+      if (pkg.auxiliary) {
+        formData.append('auxiliary_file', pkg.auxiliary);
       }
-
-      setStatus({ type: 'success', message: 'Synchronization complete. All assets ingested.' });
-      setPackageQueue([]);
-      if (onUploadSuccess) onUploadSuccess(firstResult);
+      if (pkg.columnMap) {
+        formData.append('column_map', JSON.stringify(pkg.columnMap));
+      }
+      formData.append('channel_config', JSON.stringify(channelConfig));
+      
+      const result = await uploadDisturbance(formData);
+      
+      setStatus({ type: 'success', message: 'Ingestion complete. Record populated in repository.' });
+      resetIngestion();
+      if (onUploadSuccess) onUploadSuccess(result);
       
     } catch (error) {
       if (error.response?.status === 409) {
         const data = error.response.data;
         setStatus({ type: 'success', message: 'RECORD EXISTS: Redirecting to analysis...' });
-        setPackageQueue([]);
         setTimeout(() => {
           if (onUploadSuccess) onUploadSuccess({ id: data.id });
         }, 1200);
@@ -137,6 +158,7 @@ const FileUploader = ({ onUploadSuccess }) => {
     }
   };
 
+
   const renderTypeSelection = () => (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
@@ -145,8 +167,8 @@ const FileUploader = ({ onUploadSuccess }) => {
       className={styles.typeGrid}
     >
       {[
-        { id: 'COMTRADE', label: 'COMTRADE', sub: 'Oscillography (CFG/DAT)', icon: <RiPulseLine /> },
-        { id: 'CSV', label: 'CSV / TEXT', sub: 'Time-Series Data', icon: <RiFileTextLine /> },
+        { id: 'COMTRADE', label: 'COMTRADE', sub: 'Oscillography', icon: <RiPulseLine /> },
+        { id: 'CSV', label: 'CSV / TEXT', sub: 'Time-Series', icon: <RiFileTextLine /> },
         { id: 'EXCEL', label: 'EXCEL', sub: 'Tabular Sheet', icon: <RiFileExcel2Line /> }
       ].map(type => (
         <div 
@@ -156,8 +178,10 @@ const FileUploader = ({ onUploadSuccess }) => {
         >
           <div className={styles.typeIcon}>{type.icon}</div>
           <div className={styles.typeInfo}>
-            <h3>{type.label}</h3>
-            <p>{type.sub}</p>
+            <div className={styles.typeTitleRow}>
+              <h3 className={styles.typeLabel}>{type.label}</h3>
+            </div>
+            <p className={styles.typeSub}>{type.sub}</p>
           </div>
         </div>
       ))}
@@ -176,11 +200,16 @@ const FileUploader = ({ onUploadSuccess }) => {
         animate={{ opacity: 1, x: 0 }}
         className={styles.configContainer}
       >
-        <div className={styles.headerRow}>
-          <span className={styles.configLabel}>{ingestionType} Protocol</span>
-          <button onClick={resetIngestion} className={styles.backBtn}>
-            <RiArrowGoBackLine /> Change Format
-          </button>
+        <div className={styles.protocolHeader}>
+          <div className={styles.protocolIcon}>
+            {ingestionType === 'COMTRADE' ? <RiPulseLine /> : (ingestionType === 'CSV' ? <RiFileTextLine /> : <RiFileExcel2Line />)}
+          </div>
+          <div className={styles.protocolInfo}>
+            <span className={styles.protocolTitle}>{ingestionType} PROTOCOL</span>
+            <button onClick={resetIngestion} className={styles.backLink}>
+              <RiArrowGoBackLine /> CHANGE FORMAT
+            </button>
+          </div>
         </div>
 
         <div className={styles.slotGroup}>
@@ -215,11 +244,11 @@ const FileUploader = ({ onUploadSuccess }) => {
 
         <div className={styles.actions}>
           <button 
-            className={`${styles.btn} ${styles.btnPrimary} ${!isComplete ? styles.btnDisabled : ''}`}
-            disabled={!isComplete}
+            className={`${styles.btn} ${styles.btnPrimary} ${(!isComplete || isScanning) ? styles.btnDisabled : ''}`}
+            disabled={!isComplete || isScanning}
             onClick={addToQueue}
           >
-            <RiAddLine /> Stage Asset
+            {isScanning ? <><RiLoader4Line className="animate-spin" /> Validating...</> : <><RiCheckDoubleLine /> Verify & Map Channels</>}
           </button>
         </div>
 
@@ -243,9 +272,15 @@ const FileUploader = ({ onUploadSuccess }) => {
 
   return (
     <div className={styles.uploaderContainer}>
-      <h2 className={styles.ingestionTitle}>
-        <RiCloudLine /> Disturbance Ingestion
-      </h2>
+      <div className={styles.header}>
+        <div className={styles.headerIcon}>
+          <RiCloudLine />
+        </div>
+        <div className={styles.headerText}>
+          <h3 className={styles.headerTitle}>Disturbance Ingestion</h3>
+          <span className={styles.headerSubtitle}>Signal Import</span>
+        </div>
+      </div>
 
       <AnimatePresence mode="wait">
         {mappingTarget ? (
@@ -268,63 +303,17 @@ const FileUploader = ({ onUploadSuccess }) => {
       </AnimatePresence>
 
       <AnimatePresence>
-        {packageQueue.length > 0 && (
-          <motion.div 
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className={styles.fileList}
-          >
-            <div className={styles.listHeader}>
-              <span className={styles.listTitle}>Staged Assets ({packageQueue.length})</span>
-              <button onClick={() => setPackageQueue([])} className={styles.clearBtn}>Clear All</button>
-            </div>
-            
-            {packageQueue.map((pkg) => (
-              <motion.div 
-                key={pkg.id}
-                layout
-                className={styles.fileItem}
-              >
-                <div className={`${styles.formatBadge} ${styles['badge' + pkg.type.charAt(0) + pkg.type.slice(1).toLowerCase()]}`}>
-                  {pkg.type === 'COMTRADE' ? <RiPulseLine /> : (pkg.type === 'CSV' ? <RiFileTextLine /> : <RiFileExcel2Line />)}
-                </div>
-                
-                <div className={styles.fileInfo}>
-                  <span className={styles.fileItemName}>{pkg.name}</span>
-                  <span className={styles.fileStatus}>Authenticated & Ready</span>
-                </div>
-
-                <button 
-                  onClick={(e) => { e.stopPropagation(); removeQueuedPackage(pkg.id); }} 
-                  className={styles.removeBtn}
-                  title="Remove asset"
-                >
-                  <RiDeleteBin6Line size={14} />
-                </button>
-              </motion.div>
-            ))}
-
-            <div className={styles.actions}>
-              <button 
-                className={`${styles.btn} ${styles.btnPrimary} ${isUploading ? styles.btnDisabled : ''}`}
-                onClick={handleFinalIngest}
-                disabled={isUploading}
-              >
-                {isUploading ? (
-                  <>
-                    <RiLoader4Line className="animate-spin" /> Synchronizing...
-                  </>
-                ) : (
-                  <>
-                    <RiCheckDoubleLine /> Start Ingestion
-                  </>
-                )}
-              </button>
-            </div>
-          </motion.div>
+        {scanTarget && (
+          <ChannelMappingModal
+            isIngestion={true}
+            analogChannels={scanTarget.scanData.analog}
+            digitalChannels={scanTarget.scanData.digital}
+            onSaveSuccess={handleChannelConfigComplete}
+            onClose={() => setScanTarget(null)}
+          />
         )}
       </AnimatePresence>
+
 
       <AnimatePresence>
         {status && (
