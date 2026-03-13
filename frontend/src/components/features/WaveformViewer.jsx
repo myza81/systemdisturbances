@@ -24,7 +24,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   RiPulseLine, RiLoader4Line, RiSettings3Line,
   RiDownload2Line, RiFullscreenLine, RiFullscreenExitLine,
-  RiCalculatorLine, RiAddLine, RiTableLine,
+  RiCalculatorLine, RiAddLine, RiTableLine, RiStackLine,
 } from 'react-icons/ri';
 import { useWaveformData, useChannelMeta } from '../../hooks/useWaveformData';
 import { useSettings } from '../../hooks/useSettings';
@@ -35,6 +35,9 @@ import PaginationBar from './waveform/PaginationBar';
 import SettingsModal from './settings/SettingsModal';
 import CalculatedChannelModal from './waveform/CalculatedChannelModal';
 import ChannelMappingModal from './waveform/ChannelMappingModal';
+import ChannelVisibilityDrawer from './waveform/ChannelVisibilityDrawer';
+import LayeringModal from './waveform/LayeringModal';
+import LayeringSidebar from './waveform/LayeringSidebar';
 import styles from './WaveformViewer.module.css';
 
 // ─── Phase / channel group classification ───────────────────────────────────
@@ -58,10 +61,44 @@ function classifyChannels(analogChannels) {
   return { voltage, current, other };
 }
 
+function sortChannels(channels) {
+  const phaseOrder = { 'R': 1, 'Y': 2, 'B': 3, 'N': 4 };
+  
+  return [...channels].sort((a, b) => {
+    // 1. Extract Bay/Prefix and Type (V/I)
+    // Robustly handles "KPDN1 VR", "KPDN1-VY", "KPDN1_VB", or "KPDN1VR"
+    const regex = /^(.*?)[\s\-_]*([VI])([RYBN])$/i;
+    const matchA = (a.title || a.name).match(regex);
+    const matchB = (b.title || b.name).match(regex);
+
+    if (matchA && matchB) {
+      const [_, bayA, typeA, phaseA] = matchA;
+      const [__, bayB, typeB, phaseB] = matchB;
+
+      // Group by Bay
+      if (bayA.toLowerCase() !== bayB.toLowerCase()) {
+        return bayA.toLowerCase().localeCompare(bayB.toLowerCase());
+      }
+
+      // V before I
+      if (typeA.toUpperCase() !== typeB.toUpperCase()) {
+        return typeA.toUpperCase() === 'V' ? -1 : 1;
+      }
+
+      // R-Y-B-N order
+      return (phaseOrder[phaseA.toUpperCase()] || 99) - (phaseOrder[phaseB.toUpperCase()] || 99);
+    }
+
+    // Fallback: If one doesn't match the pattern, push it to bottom of its bay or just alpha
+    return (a.title || a.name).localeCompare(b.title || b.name);
+  });
+}
+
 // ─── Build ECharts option from waveform data ──────────────────────────────
 
-function buildChartOption({ data, settings, mergedConfigs, cursors, laneHeight = 60 }) {
-  const { theme, phaseColors } = settings;
+function buildChartOption({ data, settings, mergedConfigs, cursors, samplingMode, hiddenChannels, laneHeight = 60 }) {
+  const { theme } = settings;
+  const phaseColors = settings.phaseColors || { R: '#ef4444', Y: '#f59e0b', B: '#3b82f6', N: '#10b981', default: '#64748b' };
   const channelConfigs = mergedConfigs || settings.channelConfigs || {};
   const analog = data.analog || [];
   const digital = data.digital || [];
@@ -74,8 +111,8 @@ function buildChartOption({ data, settings, mergedConfigs, cursors, laneHeight =
   const processChannel = (ch, type) => {
     const config = channelConfigs[ch.name] || {};
     
-    // Visibility check
-    if (config.visible === false) return null;
+    // Visibility check: respects session-based hiddenChannels
+    if (hiddenChannels?.has(ch.name)) return null;
 
     // Respect existing color if provided (e.g. for calculated channels)
     // or use mapped color from config
@@ -83,7 +120,13 @@ function buildChartOption({ data, settings, mergedConfigs, cursors, laneHeight =
     
     if (!color) {
       if (type === 'analog') {
-        color = phaseColors[ch.phase] || phaseColors.default || '#64748b';
+        // Try to derive phase from name if ch.phase is missing
+        let phase = ch.phase;
+        if (!phase) {
+          const m = (config.title || ch.name).match(/[RYBN]$/i);
+          if (m) phase = m[0].toUpperCase();
+        }
+        color = phaseColors[phase] || phaseColors.default || '#64748b';
       } else if (type === 'digital') {
         color = settings.theme.digitalHighColor || '#10b981';
       } else {
@@ -95,21 +138,22 @@ function buildChartOption({ data, settings, mergedConfigs, cursors, laneHeight =
     const scale = config.scale || 1;
     const title = config.title || ch.name;
     const lineStyleType = config.lineStyle || 'solid';
+    const values = ch.values || [];
 
     return { 
       ...ch, 
       type, 
       color, 
       displayName: title,
-      scaledValues: ch.values.map(v => v !== null ? v * scale : null),
+      scaledValues: values.map(v => (v !== null && v !== undefined) ? v * scale : null),
       lineStyleType
     };
   };
 
-  const allChannels = [
+  const allChannels = sortChannels([
     ...analog.map(ch => processChannel(ch, 'analog')),
     ...digital.map(ch => processChannel(ch, 'digital'))
-  ].filter(Boolean);
+  ].filter(Boolean));
 
   const grids = [];
   const xAxes = [];
@@ -211,7 +255,7 @@ function buildChartOption({ data, settings, mergedConfigs, cursors, laneHeight =
         xAxisIndex: gridIdx,
         yAxisIndex: gridIdx,
         symbol: 'none',
-        sampling: 'lttb',
+        sampling: samplingMode === 'none' ? undefined : samplingMode,
         lineStyle: { width: 1.5, color: ch.color, type: ch.lineStyleType },
         data: time_ms.map((t, i) => [t, ch.scaledValues[i] ?? null]),
         z: 3,
@@ -295,7 +339,161 @@ function buildChartOption({ data, settings, mergedConfigs, cursors, laneHeight =
         return html;
       },
     },
+    series: series,
+  };
+}
+
+function buildLayeringOption({
+  primaryData,
+  settings,
+  layeringGroups,
+  crossFileData = {},
+  primaryDisturbanceId,
+  laneHeight = 120,
+}) {
+  if (!primaryData || layeringGroups.length === 0) {
+    const { theme } = settings || { theme: { textColor: '#64748b' } };
+    return {
+      backgroundColor: 'transparent',
+      animation: false,
+      series: [],
+      graphic: {
+        type: 'text',
+        left: 'center',
+        top: 'middle',
+        style: {
+          text: !primaryData ? 'Waiting for primary waveform page...' : 'No layer groups yet.',
+          fill: theme?.textColor || '#64748b',
+          fontSize: 12,
+        }
+      }
+    };
+  }
+  const { theme } = settings;
+
+  const normalizeKey = (s) => String(s || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+
+  const grids = [];
+  const xAxes = [];
+  const yAxes = [];
+  const series = [];
+
+  // Calculate vertical layout
+  const gridSpacing = 30; // space between groups
+  const topPadding = 20;
+
+  layeringGroups.forEach((group, groupIdx) => {
+    const top = topPadding + groupIdx * (laneHeight + gridSpacing);
+    
+    grids.push({
+      top: `${top}px`,
+      height: `${laneHeight}px`,
+      left: '60px',
+      right: '60px',
+      containLabel: false
+    });
+
+    xAxes.push({
+      type: 'value',
+      gridIndex: groupIdx,
+      show: true,
+      axisLabel: { show: groupIdx === layeringGroups.length - 1, color: theme.textColor, fontSize: 10 },
+      splitLine: { show: true, lineStyle: { color: theme.gridColor, type: 'dashed', opacity: 0.3 } },
+      axisLine: { lineStyle: { color: theme.gridColor } },
+      min: 'dataMin',
+      max: 'dataMax'
+    });
+
+    yAxes.push(
+      { 
+        type: 'value',
+        gridIndex: groupIdx,
+        position: 'left',
+        splitLine: { show: true, lineStyle: { color: theme.gridColor, opacity: 0.1 } },
+        axisLabel: { color: theme.textColor, fontSize: 8 },
+      },
+      { 
+        type: 'value',
+        gridIndex: groupIdx,
+        position: 'right',
+        splitLine: { show: false },
+        axisLabel: { color: theme.textColor, fontSize: 8 },
+      }
+    );
+
+    group.channels.forEach(chCfg => {
+      // Use loose comparison to handle number vs string IDs
+      const isPrimary = !chCfg.disturbanceId || String(chCfg.disturbanceId) === String(primaryDisturbanceId);
+      const sourceData = isPrimary ? primaryData : crossFileData[chCfg.disturbanceId];
+      
+      if (!sourceData) {
+        console.warn('No source data for channel', chCfg.name, 'in group', group.name);
+        return;
+      }
+
+      const channelsData = sourceData.analog || [];
+      const analogByKey = new Map();
+      channelsData.forEach(c => {
+        const k = normalizeKey(c.name);
+        if (k && !analogByKey.has(k)) analogByKey.set(k, c);
+      });
+
+      const channel = analogByKey.get(normalizeKey(chCfg.name)) || channelsData.find(c => c.name === chCfg.name);
+      if (!channel) {
+        console.warn('[layering] Channel not found in waveform page', {
+          requested: chCfg.name,
+          disturbanceId: chCfg.disturbanceId,
+          available: channelsData.slice(0, 10).map(c => c.name),
+          availableCount: channelsData.length,
+        });
+        return;
+      }
+
+      const offset = chCfg.offsetMs || 0;
+      const sourceTime = sourceData.time_ms || [];
+      const config = (settings.channelConfigs || {})[chCfg.name] || {};
+      const scale = config.scale || 1;
+      const values = channel.values || [];
+
+      const n = Math.min(sourceTime.length, values.length);
+      if (n === 0) return;
+
+      series.push({
+        name: `${group.name}: ${chCfg.name}`,
+        type: 'line',
+        xAxisIndex: groupIdx,
+        yAxisIndex: chCfg.yAxis === 'right' ? (groupIdx * 2 + 1) : (groupIdx * 2),
+        symbol: 'none',
+        lineStyle: { width: 1.5, color: chCfg.color },
+        data: Array.from({ length: n }, (_, i) => [sourceTime[i] + offset, (values[i] ?? null) === null ? null : (values[i] * scale)]),
+        z: 3
+      });
+    });
+  });
+
+  return {
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: grids,
+    xAxis: xAxes,
+    yAxis: yAxes,
+    tooltip: { trigger: 'axis' },
     series,
+    ...(series.length === 0 ? {
+      graphic: {
+        type: 'text',
+        left: 'center',
+        top: 'middle',
+        style: {
+          text: 'No layered waveforms to display (channels not found on current page).',
+          fill: theme.textColor,
+          fontSize: 12,
+        }
+      }
+    } : {})
   };
 }
 
@@ -317,6 +515,19 @@ const WaveformViewer = ({ disturbanceId }) => {
   const [showMappingModal, setShowMappingModal] = useState(false);
   const [view, setView] = useState('raw'); 
   const [calculatedDefinitions, setCalculatedDefinitions] = useState([]);
+  const [samplingMode, setSamplingMode] = useState('none'); // 'none' (Raw) or 'lttb' (Optimized)
+  const [hiddenChannels, setHiddenChannels] = useState(new Set());
+  const [showVisibilityPanel, setShowVisibilityPanel] = useState(false);
+
+  const [allDisturbances, setAllDisturbances] = useState([]);
+  const [crossFileData, setCrossFileData] = useState({}); // { [id]: data }
+  const [layeringGroups, setLayeringGroups] = useState([]);
+  const [showLayeringModal, setShowLayeringModal] = useState(false);
+  const [activeLayeringGroupId, setActiveLayeringGroupId] = useState(null);
+  const [layeringModalEditId, setLayeringModalEditId] = useState(null);
+  const [layeringPage, setLayeringPage] = useState(1);
+  const [layeringWindowMs, setLayeringWindowMs] = useState(500);
+  const [layeringLaneHeight, setLayeringLaneHeight] = useState(120); // Taller lanes for overlays
 
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
@@ -325,7 +536,12 @@ const WaveformViewer = ({ disturbanceId }) => {
   const calcBaseResult = useWaveformData(disturbanceId, calcPage, calcWindowMs, mode);
 
   const { meta, loading: metaLoading, refetch: refetchMeta } = useChannelMeta(disturbanceId);
-  const { settings, updateSettings, getPhaseColor } = useSettings();
+  const { settings, updateSettings } = useSettings();
+
+  const getPhaseColor = useCallback((phase) => {
+    const phaseColors = { R: '#ef4444', Y: '#f59e0b', B: '#3b82f6', N: '#10b981' };
+    return phaseColors[phase] || '#64748b';
+  }, []);
 
   // Merged configurations: Record-level (from backend) + App-level (local settings)
   const mergedConfigs = useMemo(() => {
@@ -351,7 +567,7 @@ const WaveformViewer = ({ disturbanceId }) => {
     const digitalWithColor = (data.digital || [])
       .map(ch => {
         const config = mergedConfigs[ch.name] || {};
-        if (config.visible === false) return null;
+        if (hiddenChannels.has(ch.name)) return null;
         return { 
           ...ch, 
           title: config.title || ch.name,
@@ -365,7 +581,7 @@ const WaveformViewer = ({ disturbanceId }) => {
     const analogWithColor = (data.analog || [])
       .map(ch => {
         const config = mergedConfigs[ch.name] || {};
-        if (config.visible === false) return null;
+        if (hiddenChannels.has(ch.name)) return null;
         
         let unitPrefix = '';
         if (config.scale === 0.001) unitPrefix = 'k';
@@ -383,8 +599,8 @@ const WaveformViewer = ({ disturbanceId }) => {
       })
       .filter(Boolean);
 
-    return [...analogWithColor, ...digitalWithColor];
-  }, [rawResult.data, getPhaseColor, settings.theme.digitalHighColor, mergedConfigs]);
+    return sortChannels([...analogWithColor, ...digitalWithColor]);
+  }, [rawResult.data, getPhaseColor, settings.theme.digitalHighColor, mergedConfigs, hiddenChannels]);
 
   // compute engine for calculated channels
   const calculatedData = useMemo(() => {
@@ -436,13 +652,71 @@ const WaveformViewer = ({ disturbanceId }) => {
     return { time_ms, analog: computedAnalog, digital: [], total_pages: data.total_pages, total_samples: data.total_samples };
   }, [calcBaseResult.data, calculatedDefinitions]);
 
+  const handleUpdateLayering = (groups) => {
+    setLayeringGroups(groups);
+    if (!activeLayeringGroupId && groups.length > 0) {
+      setActiveLayeringGroupId(groups[0].id);
+    }
+  };
+
+  const handleAddToLayer = (channel) => {
+    let targetGroups = [...layeringGroups];
+    let activeId = activeLayeringGroupId;
+
+    if (!activeId || !layeringGroups.find(g => g.id === activeId)) {
+      const newId = Math.random().toString(36).substr(2, 9);
+      const newGroup = {
+        id: newId,
+        name: `Layer Group ${layeringGroups.length + 1}`,
+        channels: []
+      };
+      targetGroups.push(newGroup);
+      activeId = newId;
+      setActiveLayeringGroupId(newId);
+    }
+
+    const group = targetGroups.find(g => g.id === activeId);
+    if (!group) return; // Should not happen
+
+    const alreadyIn = group.channels.find(c => c.name === channel.name && c.disturbanceId === (channel.disturbanceId || disturbanceId));
+
+    if (!alreadyIn) {
+      // Basic type detection for validation
+      const unit = (channel.unit || '').toLowerCase();
+      const type = (unit.includes('v') || unit.includes('volt')) ? 'Voltage' : 
+                   (unit.includes('a') || unit.includes('amp')) ? 'Current' : 'Other';
+
+      group.channels.push({
+        name: channel.name,
+        disturbanceId: channel.disturbanceId || disturbanceId,
+        color: channel.color || '#64748b',
+        yAxis: 'left',
+        offsetMs: 0,
+        type
+      });
+      handleUpdateLayering(targetGroups);
+    }
+
+    setView('layering'); 
+  };
+
   const calcChartRef = useRef(null);
   const calcChartInstance = useRef(null);
+  const layeringChartRef = useRef(null);
+  const layeringChartInstance = useRef(null);
 
   useEffect(() => {
     if (!calculatedData || !calcChartRef.current || view !== 'advanced') return;
     if (!calcChartInstance.current) calcChartInstance.current = echarts.init(calcChartRef.current, null, { renderer: 'canvas' });
-    const option = buildChartOption({ data: calculatedData, settings, mergedConfigs, cursors, laneHeight: calcLaneHeight });
+    const option = buildChartOption({ 
+      data: calculatedData, 
+      settings, 
+      mergedConfigs, 
+      cursors, 
+      samplingMode, 
+      hiddenChannels,
+      laneHeight: calcLaneHeight 
+    });
     calcChartInstance.current.setOption(option, { notMerge: true });
 
     // Cursor click handler
@@ -499,12 +773,20 @@ const WaveformViewer = ({ disturbanceId }) => {
       calcChartInstance.current?.off('updateAxisPointer');
       calcChartInstance.current?.getZr().off('click');
     };
-  }, [calculatedData, rawResult.data, settings, cursors, calcLaneHeight, view]);
+  }, [calculatedData, rawResult.data, settings, cursors, calcLaneHeight, view, mergedConfigs, hiddenChannels, samplingMode]);
   useEffect(() => {
     const data = rawResult.data;
     if (!data || !chartRef.current) return;
     if (!chartInstance.current) chartInstance.current = echarts.init(chartRef.current, null, { renderer: 'canvas' });
-    const option = buildChartOption({ data, settings, mergedConfigs, cursors, laneHeight: rawLaneHeight });
+    const option = buildChartOption({ 
+      data, 
+      settings, 
+      mergedConfigs, 
+      cursors, 
+      samplingMode, 
+      hiddenChannels,
+      laneHeight: rawLaneHeight 
+    });
     chartInstance.current.setOption(option, { notMerge: true });
 
     const zr = chartInstance.current.getZr();
@@ -557,7 +839,91 @@ const WaveformViewer = ({ disturbanceId }) => {
       chartInstance.current?.off('updateAxisPointer');
       chartInstance.current?.getZr().off('click');
     };
-  }, [rawResult.data, calculatedData, settings, cursors, rawLaneHeight, view]);
+  }, [rawResult.data, calculatedData, settings, cursors, rawLaneHeight, view, mergedConfigs, hiddenChannels, samplingMode]);
+
+  useEffect(() => {
+    if (!layeringChartRef.current || view !== 'layering' || layeringGroups.length === 0) return;
+
+    if (!layeringChartInstance.current) {
+      layeringChartInstance.current = echarts.init(layeringChartRef.current, null, { renderer: 'canvas' });
+    }
+    const chart = layeringChartInstance.current;
+
+    // Defer init one frame so the container has size
+    let rafId = window.requestAnimationFrame(() => {
+      const option = buildLayeringOption({
+        primaryData: rawResult.data,
+        settings,
+        layeringGroups,
+        crossFileData,
+        primaryDisturbanceId: disturbanceId,
+        laneHeight: layeringLaneHeight,
+      });
+
+      chart.setOption(option, { notMerge: true });
+      // Ensure it paints even if init happened while hidden
+      chart.resize();
+    });
+
+    const zr = chart.getZr();
+    zr.off('click');
+    zr.on('click', (params) => {
+      if (!chart) return;
+      const pointInPixel = [params.offsetX, layeringLaneHeight / 2]; 
+      const pointInData = chart.convertFromPixel({ xAxisIndex: 0, yAxisIndex: 0 }, pointInPixel);
+      if (pointInData) {
+        let t = pointInData[0];
+        const tArr = rawResult.data?.time_ms || [];
+        if (tArr.length > 0) {
+          const tMin = tArr[0], tMax = tArr[tArr.length - 1];
+          t = Math.max(tMin, Math.min(tMax, t));
+        }
+        setCursors(prev => {
+          const next = { ...prev };
+          next[prev.active] = t;
+          next.active = prev.active === 'A' ? 'B' : 'A';
+          return next;
+        });
+      }
+    });
+
+    chart.off('updateAxisPointer');
+    chart.on('updateAxisPointer', (evt) => {
+      if (!evt.axesInfo || evt.axesInfo.length === 0) return;
+      const xVal = evt.axesInfo[0]?.value;
+      if (xVal === undefined) return;
+      
+      const newVals = {};
+      const tArrPrimary = rawResult.data?.time_ms || [];
+      if (tArrPrimary.length === 0) return;
+      const primaryNearest = tArrPrimary.reduce((prev, curr, i) => Math.abs(curr - xVal) < Math.abs(tArrPrimary[prev] - xVal) ? i : prev, 0);
+      
+      (rawResult.data?.analog || []).forEach(ch => { newVals[ch.name] = ch.values[primaryNearest]; });
+
+      // Add values from cross-file data
+      Object.keys(crossFileData || {}).forEach(extId => {
+        const ext = crossFileData[extId];
+        const tArrExt = ext?.time_ms || [];
+        if (tArrExt.length === 0) return;
+        const extNearest = tArrExt.reduce((prev, curr, i) => Math.abs(curr - xVal) < Math.abs(tArrExt[prev] - xVal) ? i : prev, 0);
+        (ext?.analog || []).forEach(ch => { 
+          // We use name + extId to avoid collisions in hover readout if multiple files have same channel name
+          newVals[`${ch.name}_${extId}`] = ch.values[extNearest]; 
+        });
+      });
+      
+      setHoveredValues({ t: xVal, channels: newVals });
+    });
+
+    const ro = new ResizeObserver(() => layeringChartInstance.current?.resize());
+    ro.observe(layeringChartRef.current);
+    return () => {
+      ro.disconnect();
+      chart?.off('updateAxisPointer');
+      chart?.getZr().off('click');
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [rawResult.data, layeringGroups, settings, cursors, layeringLaneHeight, view, crossFileData, disturbanceId]);
 
   const handleExternalZoom = useCallback((params) => {
     const activeChart = view === 'raw' ? chartInstance.current : calcChartInstance.current;
@@ -570,6 +936,7 @@ const WaveformViewer = ({ disturbanceId }) => {
     return () => {
       chartInstance.current?.dispose();
       calcChartInstance.current?.dispose();
+      layeringChartInstance.current?.dispose();
     };
   }, []);
 
@@ -586,7 +953,45 @@ const WaveformViewer = ({ disturbanceId }) => {
   }, [disturbanceId, meta]);
 
   useEffect(() => {
+    fetch('/api/v1/disturbances/all/')
+      .then(r => r.json())
+      .then(setAllDisturbances)
+      .catch(console.error);
+  }, []);
+
+  // Sync crossFileData for any external records in layeringGroups
+  useEffect(() => {
+    const externalIds = new Set();
+    
+    layeringGroups.forEach(g => {
+      g.channels.forEach(ch => {
+        // Only fetch if it's a valid external ID (not primary, not 'current', not null)
+        if (ch.disturbanceId && 
+            ch.disturbanceId !== disturbanceId && 
+            ch.disturbanceId !== 'current' &&
+            ch.disturbanceId !== 'null') {
+          externalIds.add(ch.disturbanceId);
+        }
+      });
+    });
+
+    externalIds.forEach(extId => {
+      if (!crossFileData[extId]) {
+        fetch(`/api/v1/disturbances/${extId}/waveform/?page=${layeringPage}&window_ms=${layeringWindowMs}&mode=${mode}`)
+          .then(r => r.json())
+          .then(res => {
+            // The waveform endpoint returns the payload at the top level.
+            // Store the whole response as { [id]: { time_ms, analog, ... } }.
+            setCrossFileData(prev => ({ ...prev, [extId]: res }));
+          })
+          .catch(console.error);
+      }
+    });
+  }, [layeringGroups, layeringPage, layeringWindowMs, mode, disturbanceId]);
+
+  useEffect(() => {
     if (view === 'raw' && chartInstance.current) setTimeout(() => chartInstance.current.resize(), 0);
+    if (view === 'layering' && layeringChartInstance.current) setTimeout(() => layeringChartInstance.current.resize(), 0);
   }, [view]);
 
   const getValuesAt = useCallback((t) => {
@@ -644,13 +1049,16 @@ const WaveformViewer = ({ disturbanceId }) => {
         mode={mode} onModeChange={setMode} laneHeight={currentLaneHeight} onLaneHeightChange={setLaneHeight}
         onOpenSettings={() => setShowSettings(true)}
         onOpenMapping={() => setShowMappingModal(true)}
+        onOpenVisibility={() => setShowVisibilityPanel(true)}
         isFullscreen={isFullscreen} onToggleFullscreen={() => setIsFullscreen(f => !f)}
+        samplingMode={samplingMode} onSamplingModeChange={setSamplingMode}
         cursors={cursors} onCursorChange={setCursors} delta={delta} meta={meta} data={currentData}
       />
 
       <div className={styles.viewTabs}>
         <button className={`${styles.viewTab} ${view === 'raw' ? styles.activeViewTab : ''}`} onClick={() => setView('raw')}>Raw Waveform</button>
         <button className={`${styles.viewTab} ${view === 'advanced' ? styles.activeViewTab : ''}`} onClick={() => setView('advanced')}>Calculated Channels</button>
+        <button className={`${styles.viewTab} ${view === 'layering' ? styles.activeViewTab : ''}`} onClick={() => setView('layering')}>Channel Layering</button>
       </div>
 
       <div className={styles.viewContent} style={{ display: view === 'raw' ? 'flex' : 'none' }}>
@@ -664,8 +1072,14 @@ const WaveformViewer = ({ disturbanceId }) => {
         <div className={styles.mainArea}>
           <div style={{ height: `${allChannels.length * rawLaneHeight + 20}px` }}>
             <ChannelSidebar
-              channels={allChannels} hoveredValues={hoveredValues} cursorAValues={cursorAValues} cursorBValues={cursorBValues}
-              cursors={cursors} settings={settings} laneHeight={rawLaneHeight}
+              channels={allChannels} 
+              hoveredValues={hoveredValues} 
+              cursorAValues={cursorAValues} 
+              cursorBValues={cursorBValues}
+              cursors={cursors} 
+              settings={settings} 
+              laneHeight={rawLaneHeight}
+              onAddToLayer={handleAddToLayer}
             />
           </div>
           <div className={styles.chartWrapper} style={{ height: `${allChannels.length * rawLaneHeight + 20}px` }}>
@@ -694,6 +1108,17 @@ const WaveformViewer = ({ disturbanceId }) => {
               />
             </div>
             <div className={styles.chartWrapper} style={{ height: `${calculatedDefinitions.length * calcLaneHeight + 20}px` }}>
+              {calcBaseResult.loading && (
+                <div className={styles.loadingOverlay}>
+                  <RiLoader4Line className={styles.spinner} />
+                  <span>Calculating virtual waveforms...</span>
+                </div>
+              )}
+              {calcBaseResult.error && (
+                <div className={styles.errorOverlay}>
+                  <p>⚠ {calcBaseResult.error}</p>
+                </div>
+              )}
               <div ref={calcChartRef} className={styles.chart} style={{ height: '100%' }} />
             </div>
           </div>
@@ -707,6 +1132,40 @@ const WaveformViewer = ({ disturbanceId }) => {
             </div>
           </div>
         )}
+      </div>
+
+      <div className={styles.viewContent} style={{ display: view === 'layering' ? 'flex' : 'none' }}>
+        <div className={styles.mainArea}>
+          <LayeringSidebar 
+            groups={layeringGroups}
+            activeGroupId={activeLayeringGroupId}
+            onSelectGroup={setActiveLayeringGroupId}
+            onUpdateGroups={handleUpdateLayering}
+            onOpenModal={(id) => {
+              setLayeringModalEditId(id);
+              setShowLayeringModal(true);
+            }}
+            samplingInterval={rawResult.data?.time_ms?.length > 1 ? (rawResult.data.time_ms[1] - rawResult.data.time_ms[0]) : 1}
+          />
+
+          {layeringGroups.length > 0 ? (
+            <div className={styles.chartWrapper} style={{ height: `${layeringGroups.length * (layeringLaneHeight + 30) + 40}px` }}>
+              {rawResult.loading && <div className={styles.loadingOverlay}><RiLoader4Line className={styles.spinner} /><span>Updating overlays...</span></div>}
+              <div ref={layeringChartRef} className={styles.chart} style={{ height: '100%' }} />
+            </div>
+          ) : (
+            <div className={styles.advancedPlaceholder}>
+              <div className={styles.placeholderContent}>
+                <RiStackLine className={styles.placeholderIcon} />
+                <h3>Streamlined Layering</h3>
+                <p>Add channels to an overlay group directly from the sidebar, or create one here.</p>
+                <button className={styles.primaryAddBtn} onClick={() => setView('raw')}>
+                  <RiPulseLine /> Go to Raw Waveform to Pick Channels
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Shared Bottom Bar */}
@@ -737,9 +1196,35 @@ const WaveformViewer = ({ disturbanceId }) => {
       </div>
 
       <AnimatePresence>
+        {showVisibilityPanel && (
+          <ChannelVisibilityDrawer 
+            channels={[
+              ...(rawResult.data?.analog || []).map(ch => ({ ...ch, type: 'analog' })),
+              ...(rawResult.data?.digital || []).map(ch => ({ ...ch, type: 'digital' }))
+            ].map(ch => ({ 
+              ...ch, 
+              title: mergedConfigs[ch.name]?.title || ch.name, 
+              color: ch.color || (ch.type === 'digital' ? settings.theme.digitalHighColor : getPhaseColor(ch.phase)) 
+            }))} 
+            hiddenChannels={hiddenChannels} 
+            onToggle={setHiddenChannels} 
+            onClose={() => setShowVisibilityPanel(false)} 
+          />
+        )}
         {showCalculatedModal && <CalculatedChannelModal analogChannels={rawResult.data?.analog || []} definitions={calculatedDefinitions} onUpdate={setCalculatedDefinitions} onClose={() => setShowCalculatedModal(false)} />}
         {showMappingModal && <ChannelMappingModal disturbanceId={disturbanceId} analogChannels={rawResult.data?.analog || []} digitalChannels={rawResult.data?.digital || []} configs={settings.channelConfigs} onUpdate={updateSettings} onSaveSuccess={refetchMeta} onClose={() => setShowMappingModal(false)} settings={settings} />}
         {showSettings && <SettingsModal settings={settings} onUpdate={updateSettings} onClose={() => setShowSettings(false)} />}
+        {showLayeringModal && (
+          <LayeringModal 
+            analogChannels={(rawResult.data?.analog || []).map(ch => ({ ...ch, disturbanceId }))} 
+            groups={layeringGroups} 
+            editingGroupId={layeringModalEditId === 'new' ? null : layeringModalEditId}
+            onUpdate={handleUpdateLayering} 
+            onClose={() => setShowLayeringModal(false)}
+            samplingInterval={rawResult.data?.time_ms?.length > 1 ? (rawResult.data.time_ms[1] - rawResult.data.time_ms[0]) : 1}
+            disturbances={allDisturbances}
+          />
+        )}
       </AnimatePresence>
     </div>
   );

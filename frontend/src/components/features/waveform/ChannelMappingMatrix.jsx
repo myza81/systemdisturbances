@@ -30,7 +30,6 @@ const ChannelMappingMatrix = ({ channels, localConfigs, onChange, isModal = fals
       <table className={styles.matrixTable}>
         <thead>
           <tr>
-            <th>Show</th>
             <th>Source Name</th>
             <th>Display Title</th>
             <th>Type</th>
@@ -46,17 +45,11 @@ const ChannelMappingMatrix = ({ channels, localConfigs, onChange, isModal = fals
             
             return (
               <tr key={`${ch.name}-${idx}`}>
-                <td className={styles.centerCol}>
-                  <input 
-                    type="checkbox" 
-                    checked={config.visible !== false}
-                    onChange={e => onChange(ch.name, 'visible', e.target.checked)}
-                    className={styles.checkbox}
-                  />
-                </td>
-                <td className={styles.sourceCol}>
-                  <code>{ch.name}</code>
-                  {ch.unit && <span className={styles.unitHint}>{ch.unit}</span>}
+                <td>
+                  <div className={styles.sourceCol}>
+                    <code>{ch.name}</code>
+                    {ch.unit && <span className={styles.unitHint}>{ch.unit}</span>}
+                  </div>
                 </td>
                 <td>
                   <input 

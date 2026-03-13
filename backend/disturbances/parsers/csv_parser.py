@@ -111,7 +111,9 @@ def parse_csv(csv_file, column_map: dict | None = None) -> dict:
     if isinstance(content, bytes):
         content = content.decode('utf-8', errors='replace')
 
-    raw = pd.read_csv(io.StringIO(content), header=0)
+    header_idx = column_map.get('start_row', 0) if column_map else 0
+    raw = pd.read_csv(io.StringIO(content), header=header_idx)
+    raw.columns = raw.columns.str.strip()
 
     # Drop rows that are entirely NaN (common in poorly formatted exports)
     raw.dropna(how='all', inplace=True)
@@ -132,12 +134,35 @@ def parse_csv(csv_file, column_map: dict | None = None) -> dict:
 
     # ── Apply user-supplied column mapping ──
     if column_map:
-        time_col = column_map.get('time')
-        if time_col and time_col in raw.columns:
-            time_array = raw[time_col].dropna().tolist()
+        time_mode = column_map.get('time_mode', 'column')
+        sample_rate_hz = column_map.get('sample_rate', 1000)
+        
+        if time_mode == 'manual':
+            # Generate synthetic time axis from sample rate
+            time_array = [i / sample_rate_hz for i in range(len(raw))]
         else:
-            time_col = _find_time_column(raw)
-            time_array = raw[time_col].dropna().tolist() if time_col else list(range(len(raw)))
+            time_col_target = column_map.get('time', '').strip()
+            time_col = next((c for c in raw.columns if c == time_col_target), None)
+            
+            if not time_col:
+                time_col = _find_time_column(raw)
+            
+            if time_col:
+                # First try numeric
+                t_series = pd.to_numeric(raw[time_col], errors='coerce')
+                if t_series.isna().all():
+                    # Try datetime
+                    try:
+                        t_series = pd.to_datetime(raw[time_col], errors='coerce')
+                        if t_series.notna().any():
+                            # Convert to relative seconds from first sample
+                            start_time = t_series.iloc[0]
+                            t_series = (t_series - start_time).dt.total_seconds()
+                    except:
+                        pass
+                time_array = t_series.dropna().tolist()
+            else:
+                time_array = list(range(len(raw)))
 
         analog_channels = []
         digital_channels = []
@@ -158,7 +183,18 @@ def parse_csv(csv_file, column_map: dict | None = None) -> dict:
     else:
         # ── Auto-detect columns via heuristics ──
         time_col = _find_time_column(raw)
-        time_array = raw[time_col].dropna().tolist() if time_col else list(range(len(raw)))
+        if time_col:
+            t_series = pd.to_numeric(raw[time_col], errors='coerce')
+            if t_series.isna().all():
+                try:
+                    t_series = pd.to_datetime(raw[time_col], errors='coerce')
+                    if t_series.notna().any():
+                        start_time = t_series.iloc[0]
+                        t_series = (t_series - start_time).dt.total_seconds()
+                except: pass
+            time_array = t_series.dropna().tolist()
+        else:
+            time_array = list(range(len(raw)))
 
         analog_channels = []
         digital_channels = []
@@ -202,13 +238,18 @@ def parse_csv(csv_file, column_map: dict | None = None) -> dict:
     else:
         trigger_time = float(time_np[len(time_np) // 2]) if len(time_np) > 0 else 0.0
 
+    # ── Prepare return ──
+    time_mode = column_map.get('time_mode', 'column') if column_map else 'column'
+    sample_rate_hz = column_map.get('sample_rate', 1000) if column_map else 0
+    final_sample_rate = sample_rate_hz if time_mode == 'manual' else sample_rate
+
     return {
         'time': time_array,
         'trigger_time': trigger_time,
-        'sample_rate': sample_rate,
+        'sample_rate': final_sample_rate,
         'station': '',
         'device': '',
-        'frequency': 50.0,   # default; user can override via settings
+        'frequency': 50.0,
         'analog': analog_channels,
         'digital': digital_channels,
     }

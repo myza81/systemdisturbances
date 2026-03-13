@@ -17,7 +17,7 @@ import {
 } from 'react-icons/ri';
 import styles from './FileUploader.module.css';
 import { uploadDisturbance, scanDisturbance } from '../../api/disturbances';
-import { ColumnMapper } from './ColumnMapper';
+import ColumnMappingModal from './waveform/ColumnMappingModal';
 import ChannelMappingModal from './waveform/ChannelMappingModal';
 
 const FileUploader = ({ onUploadSuccess }) => {
@@ -283,26 +283,18 @@ const FileUploader = ({ onUploadSuccess }) => {
       </div>
 
       <AnimatePresence mode="wait">
-        {mappingTarget ? (
-          <motion.div
-            key="mapper"
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.02 }}
-          >
-            <ColumnMapper 
-              file={mappingTarget.file} 
-              fileType={mappingTarget.type} 
-              onMapComplete={handleMapComplete}
-              onCancel={() => setMappingTarget(null)}
-            />
-          </motion.div>
-        ) : (
-          !ingestionType ? renderTypeSelection() : renderSlots()
-        )}
+        {!ingestionType ? renderTypeSelection() : renderSlots()}
       </AnimatePresence>
 
       <AnimatePresence>
+        {mappingTarget && (
+          <ColumnMappingModal 
+            file={mappingTarget.file} 
+            fileType={mappingTarget.type} 
+            onMapComplete={handleMapComplete}
+            onClose={() => setMappingTarget(null)}
+          />
+        )}
         {scanTarget && (
           <ChannelMappingModal
             isIngestion={true}

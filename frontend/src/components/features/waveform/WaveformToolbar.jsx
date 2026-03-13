@@ -5,16 +5,18 @@
 import React from 'react';
 import {
   RiPulseLine, RiSettings3Line, RiFullscreenLine, RiFullscreenExitLine,
-  RiDownload2Line, RiCursorLine, RiTableLine,
+  RiDownload2Line, RiCursorLine, RiTableLine, RiEyeLine,
 } from 'react-icons/ri';
 import styles from './WaveformToolbar.module.css';
 
 const WaveformToolbar = ({
   mode, onModeChange,
+  samplingMode, onSamplingModeChange,
   cursors, onCursorChange,
   laneHeight, onLaneHeightChange,
   onOpenSettings,
   onOpenMapping,
+  onOpenVisibility,
   isFullscreen, onToggleFullscreen,
   delta, meta, data,
 }) => {
@@ -67,6 +69,24 @@ const WaveformToolbar = ({
           </button>
         </div>
 
+        {/* High Precision / Optimized toggle */}
+        <div className={styles.precisionGroup}>
+          <button
+            className={`${styles.precisionBtn} ${samplingMode === 'none' ? styles.active : ''}`}
+            onClick={() => onSamplingModeChange('none')}
+            title="High Precision (Raw Samples)"
+          >
+            RAW
+          </button>
+          <button
+            className={`${styles.precisionBtn} ${samplingMode === 'lttb' ? styles.active : ''}`}
+            onClick={() => onSamplingModeChange('lttb')}
+            title="Optimized (Downsampled)"
+          >
+            OPT
+          </button>
+        </div>
+
         {/* Cursor A / B selector */}
         <div className={styles.cursorGroup}>
           <span className={styles.cursorLabel}>Cursor:</span>
@@ -85,6 +105,9 @@ const WaveformToolbar = ({
 
       {/* Right – action buttons */}
       <div className={styles.actionGroup}>
+        <button className={styles.iconBtn} onClick={onOpenVisibility} title="Channel Visibility">
+          <RiEyeLine />
+        </button>
         <button className={styles.iconBtn} onClick={onOpenMapping} title="Channel Mapping">
           <RiTableLine />
         </button>

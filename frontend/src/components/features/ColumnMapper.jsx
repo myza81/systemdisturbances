@@ -1,17 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { RiListCheck2, RiTimeLine, RiCloseLine, RiCheckLine, RiLoader4Line } from 'react-icons/ri';
+import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { RiTimeLine, RiLoader4Line, RiInformationLine } from 'react-icons/ri';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import styles from './ColumnMapper.module.css';
 
 const TIME_ALIASES = ['time', 't', 'timestamp', 'time(s)', 'time_s', 'sec', 'seconds', 'ms', 'time(ms)', 'time_ms'];
 
-export const ColumnMapper = ({ file, fileType, onMapComplete, onCancel }) => {
+export const ColumnMapper = forwardRef(({ file, fileType, onMapComplete, onCancel, isModal = false }, ref) => {
   const [columns, setColumns] = useState([]);
   const [mapping, setMapping] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [headerIndex, setHeaderIndex] = useState(0);
+  const [rawRows, setRawRows] = useState([]);
+  const [timeMode, setTimeMode] = useState('column'); // 'column' or 'manual'
+  const [sampleRate, setSampleRate] = useState(1000);
+
+  useImperativeHandle(ref, () => ({
+    submit: submitMapping
+  }));
 
   // Auto-detect phase from name
   const detectPhase = (name) => {
@@ -37,39 +44,49 @@ export const ColumnMapper = ({ file, fileType, onMapComplete, onCancel }) => {
   useEffect(() => {
     const parseHeaders = async () => {
       try {
+        setLoading(true);
         if (fileType === 'CSV') {
+          // First, get raw lines for preview
           Papa.parse(file, {
-            header: true,
-            preview: 5,
-            skipEmptyLines: true,
-            complete: (results) => {
-              if (results.meta.fields) {
-                initMapping(results.meta.fields, results.data);
-              } else {
-                setError('Could not detect CSV columns.');
-                setLoading(false);
+            header: false,
+            preview: 15,
+            skipEmptyLines: false,
+            complete: (rawResults) => {
+              setRawRows(rawResults.data);
+              
+              // Now parse with headers at selected index
+              // PapaParse doesn't easily skip to N rows for headers, so we slice rawRows
+              const actualRaw = rawResults.data;
+              if (actualRaw.length > headerIndex) {
+                 const headers = actualRaw[headerIndex];
+                 // Generate preview data from subsequent rows
+                 const dataPreview = actualRaw.slice(headerIndex + 1, headerIndex + 6).map(row => {
+                   const obj = {};
+                   headers.forEach((h, i) => obj[h] = row[i]);
+                   return obj;
+                 });
+                 initMapping(headers, dataPreview);
               }
-            },
-            error: (err) => {
-              setError('Failed to parse CSV: ' + err.message);
-              setLoading(false);
             }
           });
         } else if (fileType === 'EXCEL') {
           const buffer = await file.arrayBuffer();
           const wb = XLSX.read(buffer, { type: 'buffer' });
           const firstSheet = wb.Sheets[wb.SheetNames[0]];
-          const json = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-          if (json.length > 0) {
-            const headers = json[0];
-            const dataPreview = json.slice(1, 6).map(row => {
+          const rawJson = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+          
+          setRawRows(rawJson.slice(0, 15));
+          
+          if (rawJson.length > headerIndex) {
+            const headers = rawJson[headerIndex];
+            const dataPreview = rawJson.slice(headerIndex + 1, headerIndex + 6).map(row => {
               const obj = {};
               headers.forEach((h, i) => obj[h] = row[i]);
               return obj;
             });
             initMapping(headers, dataPreview);
           } else {
-            setError('Excel file appears to be empty.');
+            setError('Excel file appears to be empty or start row is out of bounds.');
             setLoading(false);
           }
         }
@@ -80,7 +97,7 @@ export const ColumnMapper = ({ file, fileType, onMapComplete, onCancel }) => {
     };
 
     parseHeaders();
-  }, [file, fileType]);
+  }, [file, fileType, headerIndex]);
 
   const initMapping = (headers, dataPreview) => {
     let timeColStr = '';
@@ -114,6 +131,38 @@ export const ColumnMapper = ({ file, fileType, onMapComplete, onCancel }) => {
     setLoading(false);
   };
 
+  const handleChannelUpdate = (origCol, field, value) => {
+    setMapping(prev => ({
+      ...prev,
+      channels: {
+        ...prev.channels,
+        [origCol]: {
+          ...prev.channels[origCol],
+          [field]: value
+        }
+      }
+    }));
+  };
+
+  const submitMapping = () => {
+    const outChannels = {};
+    Object.entries(mapping.channels).forEach(([origCol, cfg]) => {
+      outChannels[cfg.displayName] = {
+        source_column: origCol,
+        unit: cfg.unit,
+        phase: cfg.phase
+      };
+    });
+
+    onMapComplete({
+      time: mapping.timeCol,
+      time_mode: timeMode,
+      sample_rate: sampleRate,
+      channels: outChannels,
+      start_row: headerIndex // Tell backend where data actually starts
+    });
+  };
+
   if (loading) {
     return (
       <div className={styles.mapperBox}>
@@ -134,72 +183,91 @@ export const ColumnMapper = ({ file, fileType, onMapComplete, onCancel }) => {
     );
   }
 
-  const handleChannelUpdate = (origCol, field, value) => {
-    setMapping(prev => ({
-      ...prev,
-      channels: {
-        ...prev.channels,
-        [origCol]: {
-          ...prev.channels[origCol],
-          [field]: value
-        }
-      }
-    }));
-  };
-
-  const submitMapping = () => {
-    // Convert to backend expected format
-    const outChannels = {};
-    Object.entries(mapping.channels).forEach(([origCol, cfg]) => {
-      if (cfg.include) {
-        // We map displayName to its source details
-        outChannels[cfg.displayName] = {
-          source_column: origCol,
-          unit: cfg.unit,
-          phase: cfg.phase
-        };
-      }
-    });
-
-    const finalMap = {
-      time: mapping.timeCol,
-      channels: outChannels
-    };
-
-    onMapComplete(finalMap);
-  };
+  const renderRawPreview = () => (
+    <div className={styles.previewSection}>
+      <header className={styles.previewHeader}>
+        <div className={styles.previewTitle}>
+          <RiInformationLine />
+          <span>File Preview & Header Selection</span>
+        </div>
+        <span className={styles.hint}>Click a row to set it as the <strong>Header Row</strong></span>
+      </header>
+      <div className={styles.previewScroll}>
+        <table className={styles.previewTable}>
+          <tbody>
+            {rawRows.map((row, idx) => (
+              <tr 
+                key={idx} 
+                className={`${styles.previewRow} ${idx === headerIndex ? styles.activeHeader : ''} ${idx < headerIndex ? styles.metadataRow : ''}`}
+                onClick={() => setHeaderIndex(idx)}
+              >
+                <td className={styles.rowIdx}>{idx + 1}</td>
+                {row.map((cell, cIdx) => (
+                  <td key={cIdx} className={styles.previewCell}>{cell?.toString() || ''}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={styles.mapperBox}
-    >
-      <div className={styles.header}>
-        <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-          <RiListCheck2 className="text-accent-primary" /> 
-          Column Mapping
-        </h3>
-        <span className="text-xs text-text-muted font-medium">{columns.length} columns detected</span>
+    <div className={styles.mapperBox}>
+      {renderRawPreview()}
+
+      <div className={styles.timeSectionCompact}>
+        <div className={styles.timeLabel}>
+          <RiTimeLine className={styles.timeIcon} />
+          <span>Time Axis</span>
+        </div>
+        
+        <div className={styles.timeControlsCompact}>
+          <div className={styles.modeToggleCompact}>
+            <button 
+              className={`${styles.toggleBtnSmall} ${timeMode === 'column' ? styles.active : ''}`}
+              onClick={() => setTimeMode('column')}
+            >
+              From Column
+            </button>
+            <button 
+              className={`${styles.toggleBtnSmall} ${timeMode === 'manual' ? styles.active : ''}`}
+              onClick={() => setTimeMode('manual')}
+            >
+              Fixed Rate
+            </button>
+          </div>
+
+          <div className={styles.divider} />
+
+          {timeMode === 'column' ? (
+            <select 
+              className={styles.timeSelectCompact}
+              value={mapping.timeCol}
+              onChange={(e) => setMapping(prev => ({ ...prev, timeCol: e.target.value }))}
+            >
+              {columns.map((c, idx) => <option key={`${c}-${idx}`} value={c}>{c}</option>)}
+            </select>
+          ) : (
+            <div className={styles.rateInputGroupCompact}>
+              <input 
+                type="number" 
+                className={styles.rateInputCompact}
+                value={sampleRate}
+                onChange={(e) => setSampleRate(Number(e.target.value))}
+                min="1"
+              />
+              <span className={styles.rateUnitCompact}>Hz</span>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className={styles.timeSelectRow}>
-        <RiTimeLine className="text-accent-primary" />
-        <span className="text-[11px] font-bold text-text-muted ml-2 mr-4 uppercase tracking-wider">Time Axis Column:</span>
-        <select 
-          className={styles.select}
-          value={mapping.timeCol}
-          onChange={(e) => setMapping(prev => ({ ...prev, timeCol: e.target.value }))}
-        >
-          {columns.map((c, idx) => <option key={`${c}-${idx}`} value={c}>{c}</option>)}
-        </select>
-      </div>
-
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
+      <div className={styles.tableWrapper}>
+        <table className={styles.matrixTable}>
           <thead>
             <tr>
-              <th className="w-10 text-center">Inc</th>
               <th>Source Column</th>
               <th>Display Name</th>
               <th>Unit</th>
@@ -213,24 +281,17 @@ export const ColumnMapper = ({ file, fileType, onMapComplete, onCancel }) => {
               if (!cfg) return null;
 
               return (
-                <tr key={`${col}-${idx}`} className={!cfg.include ? 'opacity-50' : ''}>
-                  <td className="text-center">
-                    <input 
-                      type="checkbox" 
-                      className={styles.checkbox}
-                      checked={cfg.include}
-                      onChange={(e) => handleChannelUpdate(col, 'include', e.target.checked)}
-                    />
-                  </td>
-                  <td className="font-mono text-xs text-text-muted truncate max-w-[120px]" title={col}>
-                    {col}
+                <tr key={`${col}-${idx}`}>
+                  <td>
+                    <div className={styles.sourceCol}>
+                      <code>{col}</code>
+                    </div>
                   </td>
                   <td>
                     <input 
                       type="text" 
                       className={styles.input}
                       value={cfg.displayName}
-                      disabled={!cfg.include}
                       onChange={(e) => handleChannelUpdate(col, 'displayName', e.target.value)}
                     />
                   </td>
@@ -239,7 +300,6 @@ export const ColumnMapper = ({ file, fileType, onMapComplete, onCancel }) => {
                       type="text" 
                       className={styles.input}
                       value={cfg.unit}
-                      disabled={!cfg.include}
                       onChange={(e) => handleChannelUpdate(col, 'unit', e.target.value)}
                       placeholder="e.g. kV"
                     />
@@ -248,7 +308,6 @@ export const ColumnMapper = ({ file, fileType, onMapComplete, onCancel }) => {
                     <select 
                       className={styles.select}
                       value={cfg.phase}
-                      disabled={!cfg.include}
                       onChange={(e) => handleChannelUpdate(col, 'phase', e.target.value)}
                     >
                       <option value="R">R (Red)</option>
@@ -264,15 +323,8 @@ export const ColumnMapper = ({ file, fileType, onMapComplete, onCancel }) => {
           </tbody>
         </table>
       </div>
-
-      <div className={styles.footer}>
-        <button className={styles.btnSec} onClick={onCancel}>
-          <RiCloseLine /> Cancel
-        </button>
-        <button className={styles.btnPri} onClick={submitMapping}>
-          <RiCheckLine /> Confirm Mapping
-        </button>
-      </div>
-    </motion.div>
+    </div>
   );
-};
+});
+
+export default ColumnMapper;

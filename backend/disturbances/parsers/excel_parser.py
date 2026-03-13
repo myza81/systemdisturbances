@@ -54,7 +54,9 @@ def parse_excel(excel_file, column_map: dict | None = None, sheet_name: str | No
     xl = pd.ExcelFile(buffer)
     target_sheet = sheet_name if sheet_name and sheet_name in xl.sheet_names else _best_sheet(xl)
 
-    raw = xl.parse(target_sheet, header=0)
+    header_idx = column_map.get('start_row', 0) if column_map else 0
+    raw = xl.parse(target_sheet, header=header_idx)
+    raw.columns = raw.columns.str.strip()
     raw.dropna(how='all', inplace=True)
 
     # Detect if row 0 is a units row (all non-numeric strings)
@@ -72,12 +74,33 @@ def parse_excel(excel_file, column_map: dict | None = None, sheet_name: str | No
 
     # ── Column mapping ──
     if column_map:
-        time_col = column_map.get('time')
-        if time_col and time_col in raw.columns:
-            time_array = raw[time_col].dropna().tolist()
+        time_mode = column_map.get('time_mode', 'column')
+        sample_rate_hz = column_map.get('sample_rate', 1000)
+
+        if time_mode == 'manual':
+            time_array = [i / sample_rate_hz for i in range(len(raw))]
         else:
-            time_col = _find_time_column(raw)
-            time_array = raw[time_col].dropna().tolist() if time_col else list(range(len(raw)))
+            time_col_target = column_map.get('time', '').strip()
+            time_col = next((c for c in raw.columns if c == time_col_target), None)
+
+            if not time_col:
+                time_col = _find_time_column(raw)
+            
+            if time_col:
+                # Try numeric first
+                t_series = pd.to_numeric(raw[time_col], errors='coerce')
+                if t_series.isna().all():
+                    # Try datetime
+                    try:
+                        t_series = pd.to_datetime(raw[time_col], errors='coerce')
+                        if t_series.notna().any():
+                            start_time = t_series.iloc[0]
+                            t_series = (t_series - start_time).dt.total_seconds()
+                    except:
+                        pass
+                time_array = t_series.dropna().tolist()
+            else:
+                time_array = list(range(len(raw)))
 
         analog_channels = []
         digital_channels = []
@@ -143,10 +166,15 @@ def parse_excel(excel_file, column_map: dict | None = None, sheet_name: str | No
     # ── Sheet list for frontend column-mapper ──
     available_sheets = xl.sheet_names
 
+    # ── Prepare return ──
+    time_mode = column_map.get('time_mode', 'column') if column_map else 'column'
+    sample_rate_hz = column_map.get('sample_rate', 1000) if column_map else 0
+    final_sample_rate = sample_rate_hz if time_mode == 'manual' else sample_rate
+
     return {
         'time': time_array,
         'trigger_time': trigger_time,
-        'sample_rate': sample_rate,
+        'sample_rate': final_sample_rate,
         'station': '',
         'device': '',
         'frequency': 50.0,

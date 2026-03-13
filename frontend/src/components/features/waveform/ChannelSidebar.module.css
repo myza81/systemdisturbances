@@ -70,6 +70,31 @@
   margin-left: 4px;
 }
 
+.layerBtn {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  padding: 2px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  opacity: 0;
+}
+
+.channelRow:hover .layerBtn {
+  opacity: 1;
+}
+
+.layerBtn:hover {
+  background: var(--bg-deep);
+  color: var(--accent-primary);
+}
+
 .valueSection {
   display: flex;
   flex-direction: column;
