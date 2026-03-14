@@ -425,12 +425,13 @@ function buildLayeringOption({
     );
 
     group.channels.forEach(chCfg => {
-      // Use loose comparison to handle number vs string IDs
-      const isPrimary = !chCfg.disturbanceId || String(chCfg.disturbanceId) === String(primaryDisturbanceId);
+      // Use robust comparison to handle number vs string IDs and potential whitespace/nulls
+      const cleanId = (id) => id === null || id === undefined ? '' : String(id).trim();
+      const isPrimary = !chCfg.disturbanceId || chCfg.disturbanceId === 'current' || cleanId(chCfg.disturbanceId) === cleanId(primaryDisturbanceId);
       const sourceData = isPrimary ? primaryData : crossFileData[chCfg.disturbanceId];
       
       if (!sourceData) {
-        console.warn('No source data for channel', chCfg.name, 'in group', group.name);
+        // sourceData might be null momentarily while fetching
         return;
       }
 
@@ -659,46 +660,6 @@ const WaveformViewer = ({ disturbanceId }) => {
     }
   };
 
-  const handleAddToLayer = (channel) => {
-    let targetGroups = [...layeringGroups];
-    let activeId = activeLayeringGroupId;
-
-    if (!activeId || !layeringGroups.find(g => g.id === activeId)) {
-      const newId = Math.random().toString(36).substr(2, 9);
-      const newGroup = {
-        id: newId,
-        name: `Layer Group ${layeringGroups.length + 1}`,
-        channels: []
-      };
-      targetGroups.push(newGroup);
-      activeId = newId;
-      setActiveLayeringGroupId(newId);
-    }
-
-    const group = targetGroups.find(g => g.id === activeId);
-    if (!group) return; // Should not happen
-
-    const alreadyIn = group.channels.find(c => c.name === channel.name && c.disturbanceId === (channel.disturbanceId || disturbanceId));
-
-    if (!alreadyIn) {
-      // Basic type detection for validation
-      const unit = (channel.unit || '').toLowerCase();
-      const type = (unit.includes('v') || unit.includes('volt')) ? 'Voltage' : 
-                   (unit.includes('a') || unit.includes('amp')) ? 'Current' : 'Other';
-
-      group.channels.push({
-        name: channel.name,
-        disturbanceId: channel.disturbanceId || disturbanceId,
-        color: channel.color || '#64748b',
-        yAxis: 'left',
-        offsetMs: 0,
-        type
-      });
-      handleUpdateLayering(targetGroups);
-    }
-
-    setView('layering'); 
-  };
 
   const calcChartRef = useRef(null);
   const calcChartInstance = useRef(null);
@@ -957,37 +918,40 @@ const WaveformViewer = ({ disturbanceId }) => {
       .then(r => r.json())
       .then(setAllDisturbances)
       .catch(console.error);
-  }, []);
+  }, [disturbanceId]); // Refetch list when any new record is loaded/selected
 
   // Sync crossFileData for any external records in layeringGroups
   useEffect(() => {
+    // Optimization: find which IDs are missing or need fetching
     const externalIds = new Set();
-    
     layeringGroups.forEach(g => {
       g.channels.forEach(ch => {
-        // Only fetch if it's a valid external ID (not primary, not 'current', not null)
-        if (ch.disturbanceId && 
-            ch.disturbanceId !== disturbanceId && 
-            ch.disturbanceId !== 'current' &&
-            ch.disturbanceId !== 'null') {
-          externalIds.add(ch.disturbanceId);
+        const cid = String(ch.disturbanceId || '');
+        if (cid && cid !== 'current' && cid !== 'null' && cid !== String(disturbanceId)) {
+          externalIds.add(cid);
         }
       });
     });
 
     externalIds.forEach(extId => {
+      // Fetch if not in cache. The cache is cleared via separate effect on page/window change.
       if (!crossFileData[extId]) {
         fetch(`/api/v1/disturbances/${extId}/waveform/?page=${layeringPage}&window_ms=${layeringWindowMs}&mode=${mode}`)
           .then(r => r.json())
           .then(res => {
-            // The waveform endpoint returns the payload at the top level.
-            // Store the whole response as { [id]: { time_ms, analog, ... } }.
             setCrossFileData(prev => ({ ...prev, [extId]: res }));
           })
-          .catch(console.error);
+          .catch(err => {
+            console.error(`[layering] Fallback fetch failed for ${extId}:`, err);
+          });
       }
     });
-  }, [layeringGroups, layeringPage, layeringWindowMs, mode, disturbanceId]);
+  }, [layeringGroups, layeringPage, layeringWindowMs, mode, disturbanceId, crossFileData]);
+
+  // Handle pagination/window changes: Invalidate the crossFileData cache
+  useEffect(() => {
+    setCrossFileData({});
+  }, [layeringPage, layeringWindowMs, mode, disturbanceId]);
 
   useEffect(() => {
     if (view === 'raw' && chartInstance.current) setTimeout(() => chartInstance.current.resize(), 0);
@@ -1033,15 +997,15 @@ const WaveformViewer = ({ disturbanceId }) => {
     );
   }
 
-  const currentLaneHeight = view === 'raw' ? rawLaneHeight : calcLaneHeight;
-  const setLaneHeight = view === 'raw' ? setRawLaneHeight : setCalcLaneHeight;
-  const currentData = view === 'raw' ? rawResult.data : calcBaseResult.data;
-  const currentPage = view === 'raw' ? rawPage : calcPage;
-  const setPage = view === 'raw' ? setRawPage : setCalcPage;
-  const currentWindowMs = view === 'raw' ? rawWindowMs : calcWindowMs;
-  const setWindowMs = view === 'raw' ? setRawWindowMs : setCalcWindowMs;
-  const currentLoading = view === 'raw' ? rawResult.loading : calcBaseResult.loading;
-  const currentError = view === 'raw' ? rawResult.error : calcBaseResult.error;
+  const currentLaneHeight = view === 'raw' ? rawLaneHeight : (view === 'layering' ? layeringLaneHeight : calcLaneHeight);
+  const setLaneHeight = view === 'raw' ? setRawLaneHeight : (view === 'layering' ? setLayeringLaneHeight : setCalcLaneHeight);
+  const currentData = view === 'raw' ? rawResult.data : (view === 'layering' ? rawResult.data : calcBaseResult.data);
+  const currentPage = view === 'raw' ? rawPage : (view === 'layering' ? layeringPage : calcPage);
+  const setPage = view === 'raw' ? setRawPage : (view === 'layering' ? setLayeringPage : setCalcPage);
+  const currentWindowMs = view === 'raw' ? rawWindowMs : (view === 'layering' ? layeringWindowMs : calcWindowMs);
+  const setWindowMs = view === 'raw' ? setRawWindowMs : (view === 'layering' ? setLayeringWindowMs : setCalcWindowMs);
+  const currentLoading = view === 'raw' ? rawResult.loading : (view === 'layering' ? rawResult.loading : calcBaseResult.loading);
+  const currentError = view === 'raw' ? rawResult.error : (view === 'layering' ? rawResult.error : calcBaseResult.error);
 
   return (
     <div className={`${styles.viewerContainer} ${isFullscreen ? styles.fullscreen : ''}`}>
@@ -1079,7 +1043,6 @@ const WaveformViewer = ({ disturbanceId }) => {
               cursors={cursors} 
               settings={settings} 
               laneHeight={rawLaneHeight}
-              onAddToLayer={handleAddToLayer}
             />
           </div>
           <div className={styles.chartWrapper} style={{ height: `${allChannels.length * rawLaneHeight + 20}px` }}>
@@ -1159,9 +1122,6 @@ const WaveformViewer = ({ disturbanceId }) => {
                 <RiStackLine className={styles.placeholderIcon} />
                 <h3>Streamlined Layering</h3>
                 <p>Add channels to an overlay group directly from the sidebar, or create one here.</p>
-                <button className={styles.primaryAddBtn} onClick={() => setView('raw')}>
-                  <RiPulseLine /> Go to Raw Waveform to Pick Channels
-                </button>
               </div>
             </div>
           )}

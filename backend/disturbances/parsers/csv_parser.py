@@ -114,6 +114,19 @@ def parse_csv(csv_file, column_map: dict | None = None) -> dict:
     header_idx = column_map.get('start_row', 0) if column_map else 0
     raw = pd.read_csv(io.StringIO(content), header=header_idx)
     raw.columns = raw.columns.str.strip()
+    
+    # Handle potential duplicate columns (e.g. from whitespace stripping)
+    if raw.columns.duplicated().any():
+        new_cols = []
+        counts = {}
+        for col in raw.columns:
+            if col in counts:
+                counts[col] += 1
+                new_cols.append(f"{col}.{counts[col]}")
+            else:
+                counts[col] = 0
+                new_cols.append(col)
+        raw.columns = new_cols
 
     # Drop rows that are entirely NaN (common in poorly formatted exports)
     raw.dropna(how='all', inplace=True)

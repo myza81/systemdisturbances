@@ -71,17 +71,65 @@ def _detect_phase(channel_name: str) -> str:
     return ''
 
 
+def _parse_int_safe(val, default=0) -> int:
+    """Safely converts a value to integer, handling empty strings and malformed data."""
+    if val is None:
+        return default
+    try:
+        # Standard cleaning
+        v_str = str(val).strip()
+        if not v_str:
+            return default
+        # Handle cases where value might be float string e.g. "1.0"
+        return int(float(v_str))
+    except (ValueError, TypeError):
+        return default
+
+
+def _sanitize_cfg(cfg_content: str) -> str:
+    """
+    Sanitizes COMTRADE CFG content to handle library quirks.
+    Specifically: ensures analog (A) and status (D) suffixes exist in the header line.
+    """
+    lines = cfg_content.splitlines()
+    if len(lines) < 2:
+        return cfg_content
+
+    # Line 2: total_ch, analog_ch, status_ch
+    header = lines[1].split(',')
+    if len(header) >= 3:
+        total = header[0].strip()
+        analog = header[1].strip()
+        digital = header[2].strip()
+
+        # Add suffixes if missing (the 'comtrade' library is strict about this)
+        if analog and not analog.upper().endswith('A') and analog.isdigit():
+            header[1] = f"{analog}A"
+        if digital and not digital.upper().endswith('D') and digital.isdigit():
+            header[2] = f"{digital}D"
+        
+        lines[1] = ",".join(header)
+
+    return "\n".join(lines) + "\n"
+
+
 def parse_comtrade(cfg_file, dat_file) -> dict:
     """
     Parses COMTRADE data from file-like objects (BytesIO or Django InMemoryUploadedFile).
     Returns a standard waveform payload dict.
     """
     cfg_content = cfg_file.read()
+    if isinstance(cfg_content, bytes):
+        cfg_content = cfg_content.decode('utf-8', errors='replace')
+    
+    # Sanitize CFG for library compatibility
+    cfg_content = _sanitize_cfg(cfg_content)
+    
     dat_content = dat_file.read()
 
     # The comtrade library requires physical file paths, so we write to temp files
     with tempfile.NamedTemporaryFile(suffix='.cfg', delete=False, mode='wb') as cfg_tmp:
-        cfg_tmp.write(cfg_content if isinstance(cfg_content, bytes) else cfg_content.encode('utf-8'))
+        cfg_tmp.write(cfg_content.encode('utf-8'))
         cfg_path = cfg_tmp.name
 
     with tempfile.NamedTemporaryFile(suffix='.dat', delete=False, mode='wb') as dat_tmp:
@@ -129,9 +177,10 @@ def parse_comtrade(cfg_file, dat_file) -> dict:
         digital_channels = []
         for i in range(rec.status_count):
             ch = rec.cfg.status_channels[i]
+            # Use safe parsing to handle malformed/empty status values
             digital_channels.append({
                 'name': ch.name,
-                'values': [int(v) for v in rec.status[i]]
+                'values': [_parse_int_safe(v) for v in rec.status[i]]
             })
 
         return {

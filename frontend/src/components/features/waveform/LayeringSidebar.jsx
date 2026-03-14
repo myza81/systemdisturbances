@@ -50,7 +50,11 @@ const LayeringSidebar = ({
             className={`${styles.groupItem} ${g.id === activeGroup?.id ? styles.activeGroup : ''}`}
             onClick={() => onSelectGroup(g.id)}
           >
-            <div className={styles.groupInfo}>
+            <div 
+              className={styles.groupInfo} 
+              onClick={(e) => { e.stopPropagation(); onSelectGroup(g.id); onOpenModal(g.id); }}
+              title="Click to manage channels"
+            >
               <span className={styles.groupName}>{g.name}</span>
               <span className={styles.groupCount}>{g.channels.length} ch</span>
             </div>
@@ -66,7 +70,11 @@ const LayeringSidebar = ({
 
       {activeGroup && (
         <div className={styles.activeConfig}>
-          <div className={styles.configHeader}>
+          <div 
+            className={styles.configHeader} 
+            onClick={() => onOpenModal(activeGroup.id)}
+            title="Click to add/remove channels"
+          >
             <RiSettings3Line /> 
             <span>Configure: {activeGroup.name}</span>
           </div>

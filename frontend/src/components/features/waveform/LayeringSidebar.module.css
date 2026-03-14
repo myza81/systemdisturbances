@@ -81,6 +81,14 @@
 .groupInfo {
   display: flex;
   flex-direction: column;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.groupInfo:hover {
+  background: rgba(var(--accent-primary-rgb), 0.1);
 }
 
 .groupName {
@@ -128,6 +136,16 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 1rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  width: fit-content;
+}
+
+.configHeader:hover {
+  color: var(--accent-primary);
+  background: var(--bg-deep);
 }
 
 .channelScroll {

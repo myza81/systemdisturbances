@@ -3,7 +3,6 @@
  * Mirrors the left panel in the reference PSCAD-style waveform viewer.
  */
 import React from 'react';
-import { RiStackLine } from 'react-icons/ri';
 import styles from './ChannelSidebar.module.css';
 
 const ChannelSidebar = ({ 
@@ -13,8 +12,7 @@ const ChannelSidebar = ({
   cursorBValues, 
   cursors, 
   settings, 
-  laneHeight = 60,
-  onAddToLayer // New prop
+  laneHeight = 60
 }) => {
   const { channels: hoverVals } = hoveredValues || {};
   const { active } = cursors || {};
@@ -57,15 +55,7 @@ const ChannelSidebar = ({
                   </span>
                   {unit && <span className={styles.unit}>{unit}</span>}
                   
-                  {!isDigital && onAddToLayer && (
-                    <button 
-                      className={styles.layerBtn} 
-                      onClick={() => onAddToLayer(ch)}
-                      title="Add to Layer Group"
-                    >
-                      <RiStackLine />
-                    </button>
-                  )}
+
                 </div>
                 
                 {laneHeight >= 50 && (

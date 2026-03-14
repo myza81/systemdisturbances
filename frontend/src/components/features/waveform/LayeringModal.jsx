@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   RiCloseLine, RiAddLine, RiDeleteBinLine, 
-  RiStackLine, RiCheckboxCircleLine, RiSquareLine 
+  RiStackLine, RiCheckboxCircleLine, RiSquareLine,
+  RiLoader4Line
 } from 'react-icons/ri';
 import styles from './LayeringModal.module.css';
 
