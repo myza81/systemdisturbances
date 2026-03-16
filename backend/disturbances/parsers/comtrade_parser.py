@@ -142,17 +142,38 @@ def parse_comtrade(cfg_file, dat_file) -> dict:
 
         time_array = list(rec.time)
 
-        # Extract trigger time from COMTRADE trigger sample index
+        # Extract trigger time.
+        # Different COMTRADE sources/libraries may expose this as either:
+        # - a sample index (common in CFG: trigger sample number)
+        # - an absolute time in seconds
         trigger_time = 0.0
         try:
-            # COMTRADE CFG stores the trigger point as a sample number
-            trigger_sample = rec.cfg.trigger_time
-            if trigger_sample is not None and len(time_array) > 0:
-                trigger_time = float(trigger_sample)
-        except (AttributeError, TypeError):
-            # Fall back to midpoint if trigger info missing
+            trigger_raw = getattr(rec.cfg, 'trigger_time', None)
+            if trigger_raw is not None and len(time_array) > 0:
+                t = float(trigger_raw)
+
+                # Prefer interpreting integer-like values as sample indices.
+                # Handle both 0-based and 1-based sample numbers.
+                idx = None
+                if abs(t - round(t)) < 1e-9:
+                    i = int(round(t))
+                    if 0 <= i < len(time_array):
+                        idx = i
+                    elif 1 <= i <= len(time_array):
+                        idx = i - 1
+
+                if idx is not None:
+                    trigger_time = float(time_array[idx])
+                else:
+                    # Otherwise treat it as seconds if it falls within the record.
+                    if time_array[0] <= t <= time_array[-1]:
+                        trigger_time = t
+                    else:
+                        trigger_time = float(time_array[len(time_array) // 2])
+        except (AttributeError, TypeError, ValueError):
+            # Fall back to midpoint if trigger info missing/malformed
             if time_array:
-                trigger_time = time_array[len(time_array) // 2]
+                trigger_time = float(time_array[len(time_array) // 2])
 
         # Sample rate: use the first rate from cfg, or compute from time array
         sample_rate = 0.0

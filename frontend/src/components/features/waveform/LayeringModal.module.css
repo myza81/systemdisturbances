@@ -272,6 +272,42 @@
   padding-right: 0.5rem;
 }
 
+.eventBranch {
+  margin-bottom: 4px;
+}
+
+.eventHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: 4px;
+  color: var(--text-secondary);
+}
+
+.eventHeader:hover {
+  background: var(--bg-hover);
+}
+
+.eventChevron {
+  font-size: 0.65rem;
+  opacity: 0.8;
+}
+
+.eventName {
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eventChannels {
+  padding-left: 14px;
+  padding-bottom: 4px;
+}
+
 .pickerItem {
   display: flex;
   align-items: center;

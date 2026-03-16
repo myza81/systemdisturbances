@@ -48,8 +48,9 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     "django.middleware.security.SecurityMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django.middleware.gzip.GZipMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -62,6 +63,11 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Disturbances app: require artifact-backed waveform storage.
+# When True, legacy DB-JSON waveform records (per-sample arrays in JSONField)
+# are rejected by waveform endpoints.
+DISTURBANCES_REQUIRE_ARTIFACT = False  # TEMPORARILY DISABLED FOR DEBUG
 
 TEMPLATES = [
     {

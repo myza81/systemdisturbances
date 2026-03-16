@@ -9,12 +9,10 @@ import {
 import styles from './PaginationBar.module.css';
 
 const WINDOW_OPTIONS = [
-  { label: '100 ms', value: 100 },
-  { label: '200 ms', value: 200 },
   { label: '500 ms', value: 500 },
   { label: '1 s', value: 1000 },
-  { label: '2 s', value: 2000 },
   { label: '5 s', value: 5000 },
+  { label: '10 s', value: 10000 },
 ];
 
 const PaginationBar = ({ page, totalPages, windowMs, onPageChange, onWindowChange }) => {

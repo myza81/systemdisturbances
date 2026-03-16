@@ -162,10 +162,53 @@ def parse_excel(excel_file, column_map: dict | None = None, sheet_name: str | No
                     'values': series.fillna(0).tolist()
                 })
 
+    # ── Normalize time units to seconds ──
+    # Guarantee: payload['time'] is always seconds for all sources.
+    time_mode = column_map.get('time_mode', 'column') if column_map else 'column'
+    sample_rate_hz = column_map.get('sample_rate', 1000) if column_map else 0
+
+    def _maybe_convert_ms_to_s(time_vals, time_col_name):
+        if not time_vals:
+            return time_vals
+        col = (time_col_name or '').strip().lower()
+        name_says_ms = (
+            col in {'ms', 'time_ms', 'time(ms)', 'time (ms)'} or
+            'time_ms' in col or
+            '(ms' in col or
+            '[ms' in col or
+            col.endswith('ms')
+        )
+
+        dt = None
+        if len(time_vals) > 2:
+            deltas = [time_vals[i + 1] - time_vals[i] for i in range(min(200, len(time_vals) - 1))]
+            deltas = [d for d in deltas if d > 0]
+            if deltas:
+                dt = sum(deltas) / len(deltas)
+
+        if name_says_ms:
+            return [t / 1000.0 for t in time_vals]
+
+        if dt is not None and dt > 0:
+            sr_s = (1.0 / dt)
+            sr_ms = (1000.0 / dt)
+            if sr_s < 20 and 50 <= sr_ms <= 500000:
+                return [t / 1000.0 for t in time_vals]
+
+        return time_vals
+
+    if time_mode != 'manual':
+        time_col_name = None
+        if column_map:
+            time_col_name = (column_map.get('time') or '').strip() or None
+        else:
+            time_col_name = time_col
+        time_array = _maybe_convert_ms_to_s(time_array, time_col_name)
+
     # ── Sample rate ──
     sample_rate = 0.0
     if len(time_array) > 1:
-        deltas = [time_array[i+1] - time_array[i] for i in range(min(100, len(time_array)-1))]
+        deltas = [time_array[i + 1] - time_array[i] for i in range(min(100, len(time_array) - 1))]
         mean_dt = sum(deltas) / len(deltas)
         sample_rate = round(1.0 / mean_dt) if mean_dt > 0 else 0.0
 
@@ -180,8 +223,6 @@ def parse_excel(excel_file, column_map: dict | None = None, sheet_name: str | No
     available_sheets = xl.sheet_names
 
     # ── Prepare return ──
-    time_mode = column_map.get('time_mode', 'column') if column_map else 'column'
-    sample_rate_hz = column_map.get('sample_rate', 1000) if column_map else 0
     final_sample_rate = sample_rate_hz if time_mode == 'manual' else sample_rate
 
     return {

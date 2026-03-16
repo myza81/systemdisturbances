@@ -31,8 +31,19 @@ const LayeringModal = ({
   
   const [loadingChannels, setLoadingChannels] = useState(false);
   const [validationError, setValidationError] = useState(null);
-  const [selectedDisturbanceId, setSelectedDisturbanceId] = useState(null);
-  const [activeAnalogChannels, setActiveAnalogChannels] = useState(initialChannels);
+  const [expandedEvents, setExpandedEvents] = useState(new Set());
+  const [eventChannels, setEventChannels] = useState(() => {
+    // Seed current record's analog channels if they carry a disturbanceId
+    const map = {};
+    (initialChannels || []).forEach(ch => {
+      if (ch && ch.disturbanceId) {
+        const id = String(ch.disturbanceId);
+        if (!map[id]) map[id] = [];
+        map[id].push(ch);
+      }
+    });
+    return map;
+  });
 
   // Initialize state based on editingGroupId
   useEffect(() => {
@@ -49,21 +60,30 @@ const LayeringModal = ({
     setValidationError(null);
   }, [editingGroupId, groups]);
 
-  // Fetch channels when disturbance changed in selector
-  useEffect(() => {
-    if (!selectedDisturbanceId) {
-      setActiveAnalogChannels(initialChannels);
-      return;
-    }
-    setLoadingChannels(true);
-    fetch(`/api/v1/disturbances/${selectedDisturbanceId}/channels/`)
-      .then(r => r.json())
-      .then(data => {
-        setActiveAnalogChannels((data.analog || []).map(ch => ({ ...ch, disturbanceId: selectedDisturbanceId })));
-      })
-      .catch(console.error)
-      .finally(() => setLoadingChannels(false));
-  }, [selectedDisturbanceId, initialChannels]);
+  const toggleEventExpanded = (eventId) => {
+    const id = String(eventId);
+    setExpandedEvents(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+        // Lazy-load channels when expanding for the first time
+        if (!eventChannels[id]) {
+          setLoadingChannels(true);
+          fetch(`/api/v1/disturbances/${id}/channels/`)
+            .then(r => r.json())
+            .then(data => {
+              const analog = (data.analog || []).map(ch => ({ ...ch, disturbanceId: id }));
+              setEventChannels(prevMap => ({ ...prevMap, [id]: analog }));
+            })
+            .catch(console.error)
+            .finally(() => setLoadingChannels(false));
+        }
+      }
+      return next;
+    });
+  };
 
   const handleSave = () => {
     if (!tempName.trim() || tempChannels.length === 0) return;
@@ -151,53 +171,68 @@ const LayeringModal = ({
               />
             </div>
 
-            <div className={styles.editorLayout}>
-              <div className={styles.channelPicker}>
-                <label className={styles.fieldLabel}>Disturbance Record</label>
-                <select 
-                  className={styles.disturbanceSelect}
-                  value={selectedDisturbanceId || ''}
-                  onChange={(e) => setSelectedDisturbanceId(e.target.value)}
-                >
-                  <option value="">Current Record</option>
-                  {disturbances.map(d => (
-                    <option key={d.id} value={d.id}>{d.name || `Record ${d.id}`}</option>
-                  ))}
-                </select>
+             <div className={styles.editorLayout}>
+               <div className={styles.channelPicker}>
+                 <label className={styles.fieldLabel}>Available Analog Signals</label>
+                 <div className={styles.pickerScroll}>
+                   {loadingChannels && (
+                     <div className={styles.pickerLoading}><RiLoader4Line className={styles.spinner} /></div>
+                   )}
+                   {disturbances.map((d) => {
+                     const id = String(d.id);
+                     const isExpanded = expandedEvents.has(id);
+                     const analogList = eventChannels[id] || [];
+                     const isCurrent = (initialChannels || []).some(ch => String(ch.disturbanceId) === id);
+                     const label = d.name || (isCurrent ? 'Current Event' : `Event ${d.id}`);
 
-                <label className={styles.fieldLabel} style={{ marginTop: '1.25rem' }}>Select Channels</label>
-                <div className={styles.pickerScroll}>
-                  {loadingChannels ? (
-                    <div className={styles.pickerLoading}><RiLoader4Line className={styles.spinner} /></div>
-                  ) : (
-                    activeAnalogChannels.map(ch => {
-                      const isSelected = tempChannels.find(tc => tc.name === ch.name && tc.disturbanceId === ch.disturbanceId);
-                      const chType = getChannelType(ch.unit);
-                      const existingTypes = new Set(tempChannels.map(tc => tc.type));
-                      const isFull = existingTypes.size >= 2;
-                      const isCompatible = existingTypes.has(chType);
-                      const isDisabled = !isSelected && isFull && !isCompatible;
+                     return (
+                       <div key={id} className={styles.eventBranch}>
+                         <div 
+                           className={styles.eventHeader}
+                           onClick={() => toggleEventExpanded(id)}
+                           title="Click to expand/collapse channels"
+                         >
+                           <span className={styles.eventChevron}>{isExpanded ? '▾' : '▸'}</span>
+                           <span className={styles.eventName}>{label}</span>
+                         </div>
+                         {isExpanded && (
+                           <div className={styles.eventChannels}>
+                             {analogList.length === 0 ? (
+                               <div className={styles.emptyList}>No analog channels</div>
+                             ) : (
+                               analogList.map(ch => {
+                                 const isSelected = tempChannels.find(tc => tc.name === ch.name && String(tc.disturbanceId) === String(ch.disturbanceId));
+                                 const chType = getChannelType(ch.unit);
+                                 const existingTypes = new Set(tempChannels.map(tc => tc.type));
+                                 const isFull = existingTypes.size >= 2;
+                                 const isCompatible = existingTypes.has(chType);
+                                 const isDisabled = !isSelected && isFull && !isCompatible;
 
-                      return (
-                        <div 
-                          key={`${ch.disturbanceId}-${ch.name}`} 
-                          className={`${styles.pickerItem} ${isSelected ? styles.itemSelected : ''} ${isDisabled ? styles.itemDisabled : ''}`}
-                          onClick={() => !isDisabled && toggleChannelSelection(ch)}
-                          title={isDisabled ? `Cannot add ${chType} channel. Group already has 2 types.` : ''}
-                        >
-                          <div className={styles.checkIcon}>
-                            {isSelected ? <RiCheckboxCircleLine /> : <RiSquareLine />}
-                          </div>
-                          <div className={styles.chRowText}>
-                            <span className={styles.chTitle}>{ch.title || ch.name}</span>
-                            {ch.unit && <span className={styles.chUnit}>{ch.unit}</span>}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
+                                 return (
+                                   <div 
+                                     key={`${ch.disturbanceId}-${ch.name}`} 
+                                     className={`${styles.pickerItem} ${isSelected ? styles.itemSelected : ''} ${isDisabled ? styles.itemDisabled : ''}`}
+                                     onClick={() => !isDisabled && toggleChannelSelection(ch)}
+                                     title={isDisabled ? `Cannot add ${chType} channel. Group already has 2 types.` : ''}
+                                   >
+                                     <div className={styles.checkIcon}>
+                                       {isSelected ? <RiCheckboxCircleLine /> : <RiSquareLine />}
+                                     </div>
+                                     <div className={styles.chRowText}>
+                                       <span className={styles.chTitle}>{ch.title || ch.name}</span>
+                                       {ch.unit && <span className={styles.chUnit}>{ch.unit}</span>}
+                                     </div>
+                                   </div>
+                                 );
+                               })
+                             )}
+                           </div>
+                         )}
+                       </div>
+                     );
+                   })}
+                 </div>
+               </div>
 
               <div className={styles.configList}>
                 <label className={styles.fieldLabel}>Selected Channels</label>

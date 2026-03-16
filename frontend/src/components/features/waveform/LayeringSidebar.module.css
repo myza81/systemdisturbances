@@ -6,30 +6,90 @@
   flex-direction: column;
   overflow: hidden;
   height: 100%;
+  position: relative;
 }
 
-.header {
-  padding: 1rem;
+.collapsibleHeader, .collapsibleHeaderMini {
+  padding: 0.4rem 0.6rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background: var(--bg-deep);
   border-bottom: 1px solid var(--border-light);
+  cursor: pointer;
+  user-select: none;
 }
 
-.title {
+.collapsibleHeaderMini {
+  margin-top: 0.5rem;
+  background: transparent;
+  border-top: 1px solid var(--border-light);
+}
+
+.headerTitle {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8rem;
+  gap: 0.3rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
-.icon {
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.puMiniToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding-right: 0.4rem;
+  border-right: 1px solid var(--border-light);
+}
+
+.puMiniLabel {
+  font-size: 0.6rem;
+  font-weight: 800;
   color: var(--accent-primary);
 }
 
-.addBtn {
+.toggleSwitch {
+  width: 28px;
+  height: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.toggleOn {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.toggleKnob {
+  width: 10px;
+  height: 10px;
+  background: white;
+  border-radius: 50%;
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  transition: all 0.2s ease;
+}
+
+.toggleOn .toggleKnob {
+  left: 15px;
+}
+
+
+.addBtn, .refBtn {
   width: 24px;
   height: 24px;
   display: flex;
@@ -43,24 +103,34 @@
   transition: all 0.2s;
 }
 
-.addBtn:hover {
+.addBtn:hover, .refBtn:hover, .refBtn.rulerActive {
   background: var(--accent-primary);
   color: white;
 }
 
+.refBtn.rulerActive {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 8px rgba(var(--accent-primary-rgb), 0.4);
+}
+
+.icon {
+  color: var(--accent-primary);
+}
+
 .groupList {
-  max-height: 200px;
-  overflow-y: auto;
-  padding: 0.5rem;
+  padding: 0.25rem 0.5rem;
   border-bottom: 1px solid var(--border-light);
   background: var(--bg-deep);
+  flex-shrink: 0;
+  max-height: 150px;
+  overflow-y: auto;
 }
 
 .groupItem {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 0.75rem;
+  padding: 0.35rem 0.75rem;
   border-radius: 6px;
   border: 1px solid transparent;
   cursor: pointer;
@@ -72,19 +142,17 @@
   background: rgba(255, 255, 255, 0.5);
 }
 
-.activeGroup {
-  background: white !important;
-  border-color: var(--accent-primary);
-  box-shadow: var(--shadow-sm);
-}
 
 .groupInfo {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 1px 4px;
   border-radius: 4px;
   transition: background 0.2s;
+  flex: 1;
 }
 
 .groupInfo:hover {
@@ -92,13 +160,13 @@
 }
 
 .groupName {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .groupCount {
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   color: var(--text-muted);
   font-family: var(--font-mono);
 }
@@ -123,24 +191,51 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 1rem;
+  padding: 0.5rem 0.75rem;
+  min-height: 0;
 }
 
 .configHeader {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.7rem;
+  justify-content: space-between;
+  gap: 0.4rem;
+  font-size: 0.65rem;
   font-weight: 800;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.configHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
-  transition: all 0.2s;
-  width: fit-content;
+  flex: 1;
+}
+
+.configHeaderLeft:hover {
+  color: var(--accent-primary);
+}
+
+.groupDeleteBtnHeader {
+  background: transparent;
+  border: none;
+  color: var(--accent-ruby);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.groupDeleteBtnHeader:hover {
+  opacity: 1;
 }
 
 .configHeader:hover {
@@ -153,24 +248,30 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
   padding-right: 4px;
 }
 
 .channelRow {
   background: var(--bg-deep);
   border: 1px solid var(--border-light);
-  border-radius: 8px;
-  padding: 0.625rem;
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.3rem;
 }
 
 .rowTop {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.rowTopRight {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
 }
 
 .colorIndicator {
@@ -225,17 +326,51 @@
 .rowBottom {
   display: flex;
   align-items: center;
+  justify-content: space-between;
 }
 
-.offsetControl {
-  flex: 1;
+.rowBottomRight {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 0.35rem;
+}
+
+/* Offset Control - Compact */
+.offsetControl {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
   background: white;
-  padding: 2px 6px;
+  padding: 1px 4px;
   border-radius: 4px;
   border: 1px solid var(--border-light);
+  flex: 1;
+}
+
+.offsetControl input {
+  width: 45px;
+  border: none;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+  padding: 0;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.offsetControl button {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  font-size: 0.8rem;
+  line-height: 1;
+  border: none;
+  background: var(--bg-deep);
+  border-radius: 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .offsetIcon {
@@ -243,34 +378,190 @@
   color: var(--text-muted);
 }
 
-.offsetControl button {
-  width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-deep);
-  border: 1px solid var(--border-light);
-  border-radius: 3px;
-  font-size: 0.7rem;
-  cursor: pointer;
-}
-
-.offsetControl input {
-  width: 45px;
-  border: none;
-  text-align: center;
-  font-size: 0.65rem;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  color: var(--text-primary);
-  outline: none;
-}
-
 .unit {
   font-size: 0.6rem;
   color: var(--text-muted);
   font-weight: 700;
+}
+
+.modeToggle {
+  display: flex;
+  gap: 2px;
+  background: white;
+  padding: 2px;
+  border-radius: 4px;
+  border: 1px solid var(--border-light);
+}
+
+.modeBtn {
+  padding: 1px 6px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  border-radius: 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.modeActive {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.puBaseBadge {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.puBaseBadge:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.visibilityBtn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-right: 4px;
+  transition: all 0.15s;
+}
+
+.visibilityBtn:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: white;
+}
+
+.visibilityBtn.hidden {
+  color: var(--accent-ruby);
+  opacity: 0.6;
+}
+
+.visibilityBtn.hidden:hover {
+  opacity: 1;
+}
+
+.channelRow.hidden {
+  opacity: 0.6;
+}
+
+.channelRow.hidden .name {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.puModalBackdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.puModal {
+  background: var(--bg-surface);
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+  padding: 0.75rem 0.9rem;
+  width: 220px;
+  box-shadow: var(--shadow-md);
+}
+
+.puModalHeader {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.puModalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 0.5rem;
+}
+
+.puModalBody label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.puModalBody span {
+  font-weight: 600;
+}
+
+
+.puModalRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.puModalLabel {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  min-width: 52px;
+}
+
+.puModalBody input {
+  width: 100px;
+  padding: 4px 6px;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  border-radius: 4px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+}
+
+.puModalBody input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.puModalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.puModalButton {
+  padding: 3px 8px;
+  font-size: 0.7rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-deep);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.puModalPrimary {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #ffffff;
 }
 
 .manageBtn {
@@ -329,4 +620,22 @@
   font-weight: 600;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
+}
+
+/* Reference Probes Section */
+.refProbesSection {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.refList {
+  display: flex;
+}
+
+.refIconBtnRed:hover {
+  color: var(--accent-ruby);
 }

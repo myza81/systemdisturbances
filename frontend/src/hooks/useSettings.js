@@ -12,14 +12,14 @@ export const DEFAULT_SETTINGS = {
     background: '#ffffff',
     gridColor: '#f1f5f9',
     textColor: '#64748b',
-    cursorAColor: '#ef4444',
-    cursorBColor: '#006064',
+    cursorAColor: '#ff0000',
+    cursorBColor: '#00ee00',
     digitalHighColor: '#00e676',
     digitalLowColor: '#f1f5f9',
   },
   display: {
     showRmsOverlay: false,
-    defaultWindowMs: 500,
+    defaultWindowMs: 1000,
   },
   channelConfigs: {}, // Stores per-channel mapping (visibility, title, color, scale, style)
 };

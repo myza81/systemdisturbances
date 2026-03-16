@@ -48,6 +48,43 @@ Note on "browser is closed": the server cannot reliably know when a browser clos
   - `npm -C frontend run build` (succeeds; bundle is very large)
 - Backend runtime checks were NOT runnable in this environment because Django isn’t installed in the current Python environment (`python backend/manage.py check` fails with `ModuleNotFoundError: No module named 'django'`).
 
+## Re-Audit Notes (After Your Recent Code Updates)
+
+You updated multiple files since the previous audit. The current working tree includes changes in:
+
+- Backend parsers: `backend/disturbances/parsers/comtrade_parser.py`, `backend/disturbances/parsers/csv_parser.py`, `backend/disturbances/parsers/excel_parser.py`
+- Backend views: `backend/disturbances/views.py`
+- Frontend viewer + layering UI: `frontend/src/components/features/WaveformViewer.jsx` and related layering components
+
+Key changes observed:
+
+- COMTRADE CFG sanitization added (adds missing `A`/`D` suffixes) and safer parsing for digital/status values.
+- CSV/Excel parsers now handle duplicate column names after whitespace stripping.
+- Layering robustness improved (ID normalization, cache invalidation on page/window/mode changes).
+
+These changes improve ingestion robustness and some layering correctness, but they do not yet address the primary render-performance bottlenecks (option rebuilds on cursor/mode changes and per-series `[x,y]` allocations).
+
+## Re-Audit Notes (After Phase 0 + Phase 1 Work)
+
+You requested to start Phase 0 and Phase 1 focusing on smoother rendering without downsampling. The following changes were implemented in `frontend/src/components/features/WaveformViewer.jsx`:
+
+- Dev-only perf logging toggle: set `localStorage.waveform_perf = "1"` to log option-build and `setOption` timings.
+- Reduced per-series allocation by switching the raw/calculated charts to `xAxis.type = 'category'` with `xAxis.data = time_ms`, and feeding series `data` as Y arrays (no per-series `[x,y]` pair construction).
+- Decoupled cursor updates from full chart rebuilds:
+  - full `setOption(..., { notMerge: true })` only occurs on data/config changes
+  - cursor overlays (markLines) are updated via a lightweight `setOption({ series: [...] })` patch
+- Replaced linear nearest-index scans with a binary search helper.
+- Throttled hover updates using `requestAnimationFrame` and "only update when index changes" guards.
+
+Expected effect:
+
+- Cursor placement and hover readouts should be significantly more responsive with many channels.
+- Raw/Calculated view updates avoid large allocation churn.
+
+Notes:
+
+- Channel Layering still builds `[x,y]` pairs (offset logic); it has binary-search + hover throttling improvements, but further optimization is planned in Phase 2.
+
 ## Executive Findings (Prioritized)
 
 ### P0 (Must Fix Before Multi-User Online Deployment)
@@ -124,6 +161,11 @@ Fix:
   - `data: time_ms.map((t, i) => [t, ch.scaledValues[i]])`
 - This allocates a new `[t, v]` array for every sample for every channel, every time options are rebuilt.
 
+Re-audit update:
+
+- This pattern is still present and is a major contributor to sluggishness with many channels.
+- The chart option is rebuilt in effects that depend on `cursors` and `mode`, so cursor moves and Instantaneous/RMS toggles currently rebuild all series.
+
 Impact:
 
 - For N channels and M samples/window, memory and CPU cost is roughly O(N*M) allocations per render.
@@ -150,6 +192,11 @@ Fix:
 - Standardize API base to relative paths (preferred) or `import.meta.env.VITE_API_BASE`.
 - Centralize fetch/axios configuration in one client module.
 
+Re-audit update:
+
+- `frontend/vite.config.js` proxy target changed from `127.0.0.1` to `localhost` (fine for dev).
+- The hard-coded `http://localhost:8000/api/v1` constants are still present in hooks and should still be removed for production.
+
 6) COMTRADE trigger time extraction likely incorrect
 
 - `backend/disturbances/parsers/comtrade_parser.py` sets `trigger_time = float(trigger_sample)`.
@@ -162,6 +209,10 @@ Impact:
 Fix:
 
 - Confirm what `python-comtrade` exposes for trigger; convert correctly to seconds.
+
+Re-audit update:
+
+- You added CFG sanitization and safer digital parsing; trigger-time conversion is still worth confirming.
 
 7) CSV/Excel time parsing can desynchronize time vs signal arrays
 
@@ -190,6 +241,10 @@ Fix:
 - Make `npm run lint` part of CI and keep it passing.
 - Fix the ordering issues and remove unused imports/variables.
 
+Re-audit update:
+
+- Lint still fails (now 42 errors, 2 warnings). The failures include unused imports/vars and React hook warnings that correlate with avoidable re-renders.
+
 9) Very large frontend bundle (slow initial load)
 
 `npm -C frontend run build` output indicates:
@@ -203,6 +258,10 @@ Fix:
 - Code-split heavy features with dynamic imports (WaveformViewer, ColumnMapper/XLSX, ECharts).
 - Consider importing only used icon subsets or replacing icon strategy.
 
+Re-audit update:
+
+- Bundle size warning is still present; main chunk remains ~1.98MB minified (~659KB gzip).
+
 10) Dead/broken files and scripts
 
 - `frontend/src/components/features/WaveformChart.jsx` appears unused and calls endpoints that do not exist in the backend.
@@ -215,6 +274,10 @@ Fix:
 - Remove or relocate dev scripts into a `scripts/` folder and keep them runnable.
 - Delete unused components or wire them up.
 - Fix misleading filenames.
+
+Re-audit update:
+
+- New backend scripts exist (`backend/check_media_files.py`, `backend/list_db_records.py`, `backend/test_sanitizer.py`). If these are intended, consider moving them under a `scripts/` directory and documenting how to run them.
 
 11) Settings syncing is incomplete / misleading
 
