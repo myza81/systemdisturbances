@@ -339,33 +339,33 @@ generate_waveform("LVRT_CM.csv", 0.7, 0.25)
 
 ---
 
-# 7. Expected Waveform Shape
+# 9. Variant: LVRT_PPM (Revised)
 
-Voltage profile:
+Revised PPM variant with 150ms fault and recovery to 90% by 2.1s.
 
-```
-132 kV ────────────────┐
-                       │
-                       │
-                       │
-0 kV                   ├───────────
-                       │           /
-                       │          /
-                       │         /
-118.8 kV              │        /
-                       │       /
-                       └──────┘
-      0.5s     0.6s         1.95s
-```
+| Region | Time | Voltage |
+|---|---|---|
+| Pre-fault | 0.0 - 0.5s | 132 kV LL RMS |
+| Fault | 0.5 - 0.65s | 0 V (150ms duration) |
+| Recovery | 0.65 - 2.1s | Ramp to 118.8 kV LL RMS (0.9 pu) |
+| Stable | 2.1 - 4.0s | Flat 118.8 kV LL RMS |
 
-Behavior:
+---
 
-| Stage     | Voltage     |
-| --------- | ----------- |
-| Pre-fault | 132 kV      |
-| Fault     | 0 kV        |
-| Recovery  | linear ramp |
-| Final     | 118.8 kV    |
+# 10. Variant: LVRT_PPM_60ms_fault
+
+PPM variant with 60ms fault and recovery to 90% by 1.91s.
+
+| Region | Time | Voltage |
+|---|---|---|
+| Pre-fault | 0.0 - 500ms | 132 kV LL RMS |
+| Fault | 500ms - 560ms | 0 V (60ms duration) |
+| Recovery | 560ms - 1910ms | Ramp to 118.8 kV LL RMS (0.9 pu) |
+| Stable | 1910ms - 4000ms | Flat 118.8 kV LL RMS |
+
+---
+
+# 11. Python Implementation
 
 ---
 

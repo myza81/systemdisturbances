@@ -11,6 +11,7 @@ import styles from './PaginationBar.module.css';
 const WINDOW_OPTIONS = [
   { label: '500 ms', value: 500 },
   { label: '1 s', value: 1000 },
+  { label: '3 s', value: 3000 },
   { label: '5 s', value: 5000 },
   { label: '10 s', value: 10000 },
 ];

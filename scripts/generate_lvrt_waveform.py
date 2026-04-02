@@ -2,12 +2,11 @@ import numpy as np
 import pandas as pd
 import os
 
-def generate_waveform(filename, target_pu, recovery_duration, total_duration=5.0):
+def generate_waveform(filename, target_pu, recovery_duration, fault_duration=0.1, total_duration=5.0):
     sampling_rate = 5000
     dt = 1 / sampling_rate
 
     prefault_time = 0.5
-    fault_time = 0.1
     
     V_ll_rms = 132 # Line-to-Line RMS
     V_peak = V_ll_rms * np.sqrt(2/3) # Phase-to-Ground Peak
@@ -16,7 +15,7 @@ def generate_waveform(filename, target_pu, recovery_duration, total_duration=5.0
     freq = 50
 
     prefault_samples = int(prefault_time * sampling_rate)
-    fault_samples = int(fault_time * sampling_rate)
+    fault_samples = int(fault_duration * sampling_rate)
     recovery_samples = int(recovery_duration * sampling_rate)
     total_samples = int(total_duration * sampling_rate)
 
@@ -55,6 +54,7 @@ def generate_waveform(filename, target_pu, recovery_duration, total_duration=5.0
     df.to_csv(filename, index=False)
     print(f"Generated: {filename}")
     print(f"  Target: {target_pu} pu ({V_target_peak/np.sqrt(2):.2f} kV Ph-G RMS)")
+    print(f"  Fault Duration: {fault_duration}s")
     print(f"  Recovery Duration: {recovery_duration}s")
     print(f"  Total Duration: {total_duration}s")
 
@@ -64,3 +64,15 @@ if __name__ == "__main__":
     
     # New CM spec: recovery to 0.7 pu in 0.25s (from 0.6s to 0.85s)
     generate_waveform("LVRT_CM.csv", target_pu=0.7, recovery_duration=0.25)
+
+    # New CM 60ms fault variant: recovery to 0.7 pu in 0.25s (from 0.56s to 0.81s)
+    generate_waveform("LVRT_CM_60sfault.csv", target_pu=0.7, recovery_duration=0.25, fault_duration=0.06)
+
+    # New PPM 60ms fault variant: recovery to 0.9 pu in 0.25s (from 0.56s to 0.81s)
+    generate_waveform("LVRT_PPM_60sfault.csv", target_pu=0.9, recovery_duration=0.25, fault_duration=0.06)
+
+    # Revised PPM variant: recovery to 0.9 pu in 1.45s (from 0.65s to 2.1s)
+    generate_waveform("LVRT_PPM.csv", target_pu=0.9, recovery_duration=1.45, fault_duration=0.15, total_duration=4.0)
+
+    # PPM 60ms fault variant (revised): recovery to 0.9 pu in 1.35s (from 0.56s to 1.91s)
+    generate_waveform("LVRT_PPM_60ms_fault.csv", target_pu=0.9, recovery_duration=1.35, fault_duration=0.06, total_duration=4.0)

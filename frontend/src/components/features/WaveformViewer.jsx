@@ -567,6 +567,7 @@ function buildLayeringOption({
   primaryDisturbanceId,
   laneHeight = 120,
   puMode = false,
+  windowMs = 1000,
   refLinesVersion, // Added to trigger re-render
   gridConfigVersion, // Added to trigger re-render
   rulerVersion,
@@ -623,32 +624,46 @@ function buildLayeringOption({
       borderWidth: 1,
     });
 
+    const timeData = primaryData?.time_ms || [];
+    const tMin = timeData[0] ?? 0;
+    const tMax = timeData[timeData.length - 1] ?? (windowMs || 1000);
+    
+    const xInterval = windowMs >= 3000 ? 500 : 100;
+    const xMinorInterval = windowMs >= 3000 ? 100 : 50;
+
     xAxes.push({
       type: 'value',
       gridIndex: groupIdx,
       show: true,
-      axisLabel: { show: groupIdx === layeringGroups.length - 1, color: theme.textColor, fontSize: 10 },
+      axisLabel: { 
+        show: groupIdx === layeringGroups.length - 1, 
+        color: theme.textColor, 
+        fontSize: 10,
+        interval: 0,
+        formatter: (val) => (val / 1000).toFixed(1) + 's'
+      },
+      min: tMin,
+      max: tMax,
+      interval: xInterval,
       splitLine: { 
-        show: gridConfig.x.major.show, 
-        interval: gridConfig.x.major.interval,
+        show: true, 
+        interval: xInterval,
         lineStyle: { 
           color: theme.gridColor || '#f1f5f9', 
-          type: gridConfig.x.major.type, 
-          opacity: gridConfig.x.major.opacity 
+          type: 'solid', 
+          opacity: 0.5 
         } 
       },
       minorSplitLine: {
-        show: gridConfig.x.minor.show,
-        interval: gridConfig.x.minor.interval,
+        show: true,
+        interval: xMinorInterval,
         lineStyle: {
-          color: theme.gridColor || '#f1f5f9',
-          type: gridConfig.x.minor.type,
-          opacity: gridConfig.x.minor.opacity
+          color: theme.gridColor || '#e2e8f0',
+          type: 'dotted',
+          opacity: 0.3
         }
       },
       axisLine: { lineStyle: { color: theme.gridColor || '#f1f5f9' } },
-      min: 'dataMin',
-      max: 'dataMax'
     });
 
     // Add Interactive Ruler (Secondary X-Axis) 
@@ -745,14 +760,21 @@ function buildLayeringOption({
       // ECharts allows setting 'position' [x, y] in graphic group
     }
 
+    const yMajorInterval = puMode ? 0.1 : (gridConfig.y.major.interval ?? 0.1);
+    const yMinorInterval = puMode ? 0.05 : (gridConfig.y.minor.interval ?? 0.05);
+    const yMin = puMode ? 0 : 'dataMin';
+    const yMax = puMode ? 1.5 : 'dataMax';
+
     yAxes.push(
       { 
         type: 'value',
         gridIndex: groupIdx,
         position: 'left',
+        min: yMin,
+        max: yMax,
+        splitNumber: puMode ? 15 : undefined,
         splitLine: { 
           show: gridConfig.y.major.show, 
-          interval: gridConfig.y.major.interval,
           lineStyle: { 
             color: theme.gridColor || '#f1f5f9', 
             type: gridConfig.y.major.type,
@@ -760,12 +782,11 @@ function buildLayeringOption({
           } 
         },
         minorSplitLine: {
-          show: gridConfig.y.minor.show,
-          interval: gridConfig.y.minor.interval,
+          show: true,
           lineStyle: {
-            color: theme.gridColor || '#f1f5f9',
-            type: gridConfig.y.minor.type,
-            opacity: gridConfig.y.minor.opacity
+            color: theme.gridColor || '#e2e8f0',
+            type: 'dotted',
+            opacity: 0.4
           }
         },
         axisLabel: { color: theme.textColor, fontSize: 8, formatter: '{value}' },
@@ -775,6 +796,9 @@ function buildLayeringOption({
         type: 'value',
         gridIndex: groupIdx,
         position: 'right',
+        min: yMin,
+        max: yMax,
+        splitNumber: puMode ? 15 : undefined,
         splitLine: { show: false },
         axisLabel: { color: theme.textColor, fontSize: 8, formatter: '{value}' },
         nameTextStyle: { color: theme.textColor, fontSize: 8 },
@@ -958,7 +982,7 @@ const WaveformViewer = ({ disturbanceId }) => {
   const [layeringModalEditId, setLayeringModalEditId] = useState(null);
   const [layeringPage, setLayeringPage] = useState(1);
   const [layeringWindowMs, setLayeringWindowMs] = useState(1000);
-  const [layeringLaneHeight, setLayeringLaneHeight] = useState(120); // Taller lanes for overlays
+  const [layeringLaneHeight, setLayeringLaneHeight] = useState(400); // Taller lanes for overlays
 
   const draggingRef = useRef(null); // 'A' or 'B' or null
   const isDraggingRef = useRef(null);
@@ -1690,7 +1714,8 @@ const WaveformViewer = ({ disturbanceId }) => {
             primaryDisturbanceId: disturbanceId,
             laneHeight: layeringLaneHeight,
             puMode: layeringPuMode,
-             refLinesVersion,
+            windowMs: layeringWindowMs,
+            refLinesVersion,
              gridConfigVersion,
              rulerVersion,
              chart,
@@ -2000,7 +2025,7 @@ const WaveformViewer = ({ disturbanceId }) => {
   useEffect(() => {
     if (view === 'raw' && chartInstance.current) setTimeout(() => chartInstance.current.resize(), 0);
     if (view === 'layering' && layeringChartInstance.current) setTimeout(() => layeringChartInstance.current.resize(), 0);
-  }, [view]);
+  }, [view, layeringWindowMs]);
 
   const getValuesAt = useCallback((t) => {
     if (t === null) return null;

@@ -1128,6 +1128,12 @@ def get_waveform(request, pk):
     frequency = record.nominal_frequency or 50.0
     mode = request.query_params.get('mode', 'instantaneous').lower()
 
+    channel_filter = request.query_params.get('channels', '')
+    filter_set = set(channel_filter.split(',')) if channel_filter else None
+
+    window_ms = float(request.query_params.get('window_ms', 500))
+    page = int(request.query_params.get('page', 1))
+
     if artifact_meta and artifact_dir:
         time_arr = load_time_s(artifact_dir, mmap=True)
         total_samples = int(time_arr.size)
@@ -1135,22 +1141,28 @@ def get_waveform(request, pk):
             return Response({'error': 'Empty time array.'}, status=status.HTTP_404_NOT_FOUND)
 
         sample_rate = float(record.sample_rate or artifact_meta.get('sample_rate') or 1000.0)
-        trigger_time_s = float(artifact_meta.get('trigger_time_s', 0.0))
-
-        window_ms = float(request.query_params.get('window_ms', 500))
         window_samples = max(1, int(round(sample_rate * window_ms / 1000.0)))
         total_pages = max(1, -(-total_samples // window_samples))
-        page = max(1, min(int(request.query_params.get('page', 1)), total_pages))
-
+        page = max(1, min(page, total_pages))
         start_idx = (page - 1) * window_samples
+        start_ms = start_idx / sample_rate * 1000.0
+        end_ms = start_ms + window_ms
+
+        cached = _window_cache.get(pk, start_ms, end_ms, tuple(sorted(filter_set)) if filter_set else (), mode)
+        if cached:
+            return Response(cached)
+
+        trigger_time_s = float(artifact_meta.get('trigger_time_s', 0.0))
         end_idx = min(start_idx + window_samples, total_samples)
 
         time_slice = time_arr[start_idx:end_idx]
-        time_ms = [round((float(t) - trigger_time_s) * 1000.0, 6) for t in time_slice.tolist()]
+        time_ms = ((time_slice - trigger_time_s) * 1000.0).round(6).tolist()
 
         analog_out = []
         a_meta = {m.get('name'): m for m in (artifact_meta.get('analog', []) or [])}
         for ch_name in a_meta.keys():
+            if filter_set and ch_name not in filter_set:
+                continue
             safe = a_meta[ch_name].get('safe', '')
             if safe:
                 arr = load_channel_array(artifact_dir, 'analog', safe, mmap=True)
@@ -1169,6 +1181,8 @@ def get_waveform(request, pk):
         digital_out = []
         d_meta = {m.get('name'): m for m in (artifact_meta.get('digital', []) or [])}
         for ch_name in d_meta.keys():
+            if filter_set and ch_name not in filter_set:
+                continue
             safe = d_meta[ch_name].get('safe', '')
             if safe:
                 arr = load_channel_array(artifact_dir, 'digital', safe, mmap=True)
@@ -1177,7 +1191,7 @@ def get_waveform(request, pk):
                     'values': arr[start_idx:end_idx].tolist(),
                 })
 
-        return Response({
+        response_data = {
             'id': record.id,
             'page': page,
             'total_pages': total_pages,
@@ -1193,7 +1207,9 @@ def get_waveform(request, pk):
             'digital': digital_out,
             'station': artifact_meta.get('station', ''),
             'device': artifact_meta.get('device', ''),
-        })
+        }
+        _window_cache.set(pk, start_ms, end_ms, tuple(sorted(filter_set)) if filter_set else (), mode, response_data)
+        return Response(response_data)
 
     # Fallback: legacy payload-based data
     time_array = payload.get('time', [])
@@ -1203,14 +1219,19 @@ def get_waveform(request, pk):
         return Response({'error': 'No waveform data available.'}, status=status.HTTP_404_NOT_FOUND)
 
     sample_rate = record.sample_rate or 1000.0
-    window_ms = float(request.query_params.get('window_ms', 500))
     window_samples = max(1, int(round(sample_rate * window_ms / 1000.0)))
 
     total_pages = max(1, -(-total_samples // window_samples))
-    page = max(1, min(int(request.query_params.get('page', 1)), total_pages))
+    page = max(1, min(page, total_pages))
 
     start_idx = (page - 1) * window_samples
     end_idx = min(start_idx + window_samples, total_samples)
+    start_ms = start_idx / sample_rate * 1000.0
+    end_ms = start_ms + window_ms
+
+    cached = _window_cache.get(pk, start_ms, end_ms, tuple(sorted(filter_set)) if filter_set else (), mode)
+    if cached:
+        return Response(cached)
 
     # Slice time into ms relative to trigger
     time_slice_raw = time_array[start_idx:end_idx]
@@ -1219,6 +1240,8 @@ def get_waveform(request, pk):
     # Analog channels
     analog_out = []
     for ch in payload.get('analog', []):
+        if filter_set and ch.get('name') not in filter_set:
+            continue
         raw_values = ch['values'][start_idx:end_idx]
         if mode == 'rms':
             values = _compute_rms(raw_values, sample_rate, frequency)
@@ -1234,12 +1257,14 @@ def get_waveform(request, pk):
     # Digital channels
     digital_out = []
     for ch in payload.get('digital', []):
+        if filter_set and ch.get('name') not in filter_set:
+            continue
         digital_out.append({
             'name': ch['name'],
             'values': ch['values'][start_idx:end_idx],
         })
 
-    return Response({
+    response_data = {
         'id': record.id,
         'page': page,
         'total_pages': total_pages,
@@ -1255,33 +1280,9 @@ def get_waveform(request, pk):
         'digital': digital_out,
         'station': payload.get('station', ''),
         'device': payload.get('device', ''),
-    })
-
-    # Digital channels
-    digital_out = []
-    for ch in payload.get('digital', []):
-        digital_out.append({
-            'name': ch['name'],
-            'values': ch['values'][start_idx:end_idx],
-        })
-
-    return Response({
-        'id': record.id,
-        'page': page,
-        'total_pages': total_pages,
-        'window_ms': window_ms,
-        'start_sample': start_idx,
-        'end_sample': end_idx,
-        'total_samples': total_samples,
-        'sample_rate': sample_rate,
-        'trigger_time_ms': 0.0,   # always relative to trigger
-        'mode': mode,
-        'time_ms': time_ms,
-        'analog': analog_out,
-        'digital': digital_out,
-        'station': payload.get('station', ''),
-        'device': payload.get('device', ''),
-    })
+    }
+    _window_cache.set(pk, start_ms, end_ms, tuple(sorted(filter_set)) if filter_set else (), mode, response_data)
+    return Response(response_data)
 
 
 # ─── RMS ─────────────────────────────────────────────────────────────────────
